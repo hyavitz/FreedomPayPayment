@@ -1,0 +1,14 @@
+{
+"store_id" : "1496617013",
+"terminal_id" : 2510855011,
+"lane_id" : 0,
+"client_environment" : "QuickPointDesktop 0.0.1",
+"location_id" : "272992",
+"invoice" : 10000,
+"device" : "FreedomPay",
+"serial_number" : "2510855011",
+"application" : "QuickPointDesktop",
+"version" : 001,
+"version_name" : "0.0.1",
+"server_version" : 1,
+}

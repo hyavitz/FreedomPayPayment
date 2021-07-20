@@ -1,0 +1,15 @@
+{
+"store_id" : "12345",
+"terminal_id" : 1,
+"lane_id" : 0,
+"client_environment" : "QuickPointDesktop 0.0.1",
+"location_id" : "272992",
+"invoice" : 10000,
+"device" : "WorldPay",
+"serial_number" : "275412534",
+"application" : "QuickPointDesktop",
+"version" : 001,
+"version_name" : "0.0.1",
+"server_version" : 1,
+"merchant_id": ""
+}
