@@ -12,5 +12,5 @@ public interface IPaymentDevice {
 
     void refundPayment(int amount) throws IOException, InterruptedException;
 
-    void createToken() throws IOException;
+    void createToken() throws IOException, InterruptedException;
 }

@@ -23,9 +23,9 @@ public class TransactionDao {
             writer.write(" " + transactionData[2] + "\n"); // merchant reference code
             writer.write(" " + transactionData[3] + "\n"); // token
 
-            for (Item item : items.items) {
-                writer.write(" " + item + "\n");
-            }
+//            for (Item item : items.items) {
+//                writer.write(" " + item + "\n");
+//            }
 
             return true;
 

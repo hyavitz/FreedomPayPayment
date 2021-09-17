@@ -21,12 +21,12 @@ public class NetRegisterDevice {
     /**
      * The detected or set device type
      */
-    @SerializedName("device") private /*DeviceType*/ String device;
+    @SerializedName("device") private /*DeviceType*/ String device; // TODO: Why does this change to device_type in API call?
 
     /**
      * The Serial Number of the device
      */
-    @SerializedName("serial_number") private String serialNumber;
+    @SerializedName("serial_number") private String serialNumber; // TODO: Why does this change to device_id in API call?
 
     /**
      * The application that is being run
@@ -36,15 +36,15 @@ public class NetRegisterDevice {
     /**
      * The version name (x.x.x) of the application running
      */
-    @SerializedName("version_name") private String versionName;
+    @SerializedName("version_name") private String versionName; // TODO: Why is this ignored in API call?
 
     /**
      * THe integer version code of the application running
      */
-    @SerializedName("version") private int version;
+    @SerializedName("version") private int version; // TODO: Why does this change to app_version in API call?
 
     /**
      * The server version that we are expecting to be able to use
      */
-    @SerializedName("server_version") private long serverVersion;
+    @SerializedName("server_version") private long serverVersion; // TODO: Why is this ignored in API call?
 }

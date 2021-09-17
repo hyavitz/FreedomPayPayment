@@ -5,14 +5,15 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import lombok.Data;
 
 /**
+ * This pojo class represents a collection of items
+ * purchased from a given transaction.  An instance
+ * of Items should be populated with an array of type Item,
+ * created by the Item class, to represent total items
+ * purchased for receipt details.  An instance of this
+ * class is converted to / from XML for transaction
+ * request / response objects.
  *
- * This class accepts Item objects and builds an array which
- * is passed to the Receipt class or parsed into JSON/XML.
- *
- * This class is called by FPPaymentDevice and Receipt classes.
- *
- * @author Hunter Yavitz - 6/10/21
- *
+ * @author Hunter Yavitz - 8/10/21 - Revision
  */
 
 @Data
@@ -20,10 +21,9 @@ public class Items {
 
     @JacksonXmlElementWrapper(localName = "Item", useWrapping = false)
     @JsonProperty("Item")
-    public Item[] items;
+    private Item[] items;
 
-    public Items(){
-    }
+    public Items(){}
 
     public Items(Item[] items) {
         this.items = items;

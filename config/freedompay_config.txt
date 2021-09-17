@@ -8,7 +8,7 @@
 "device" : "FreedomPay",
 "serial_number" : "2510855011",
 "application" : "QuickPointDesktop",
-"version" : 001,
+"app_version" : 001,
 "version_name" : "0.0.1",
 "server_version" : 1,
 }

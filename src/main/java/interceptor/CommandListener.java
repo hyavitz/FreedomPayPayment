@@ -2,20 +2,14 @@ package interceptor;
 
 import com.google.gson.Gson;
 
-import com.google.gson.JsonObject;
-import io.PaymentDao;
-import org.jetbrains.annotations.NotNull;
-import org.json.JSONObject;
+import network.Token;
 import payment.IPaymentDevice;
-import payment.InvoiceNumber;
 
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
+import payment.InvoiceNumber;
+import payment.Payment;
+import payment.PaymentDetails;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * This class implements Client.CommandListener which overrides
@@ -28,17 +22,42 @@ import java.util.Map;
  * @author Hunter Yavitz 7/5/21
  */
 
+/**
+ * TODO: If !void -> Capture responseMessage.getTransactionNo() -> assign to CommandListener.transactionNumber
+ *  TODO: Else -> Generate ECRRefNum from Invoice
+ *  TODO: If makeSale() -> Assign transactionNumber to ECRRefNum for initial webhook transaction
+ *  TODO: Else -> Assign transactionNumber to OrigECRNNum for follow-on webhook transaction, generate new ECRRefNum from Invoice
+ */
+
+/**TODO: CommandListener.transactionNumber = Generate() -> insertPayment.setTransactionNo() -> PaymentRequest.setECRRefNum()
+ * TODO: makeSale() -> PaymentResponse.getRefNum [PAX] -> insertPayment.setTransactionNo()
+ * TODO: voidSale() -> responseMessage.getTransactionNo() [QP] -> CommandListener.transactionNumber
+ *                  -> PaymentRequest.setOrigECRRefNum()
+ *                  && CommandListener.transactionNumber = Generate() -> insertPayment.setTransactionNo() -> PaymentRequest.setECRRefNum()
+ */
+
 public class CommandListener implements Client.CommandListener {
 
-    //
-    public static IPaymentDevice paymentDevice;
+    public IPaymentDevice paymentDevice;
+    ResponseMessage responseMessage;
+    public static PaymentDetails paymentDetails;
 
-    //
-    public static boolean signatureOk; // TODO: Refactor to isApproved, isSignatureOk, isBankAuthOk, isComplete
-    public static boolean bankAuthOk; // TODO: Implement this parameter to support WorldPay
+    public static boolean isVoid;
+    public static boolean isApproved;
     public static boolean isComplete;
 
-    /** TODO:
+    double amount;
+    int amt;
+
+    public static String href;
+
+    public CommandListener(IPaymentDevice paymentDevice) {
+
+        System.out.println("<5><>Creating CommandListener instance with paymentDevice[" + paymentDevice + "]");
+        this.paymentDevice = paymentDevice;
+    }
+
+    /**
      * Initial payment request contains ov_ticket_id, capture and generate transactionNumber
      * Pass transactionNumber to be stored in PAX Request as transactionNo
      * Pass transactionNumber to be stored in AP as transactionNumber
@@ -46,275 +65,121 @@ public class CommandListener implements Client.CommandListener {
      *
      * Initial void request contains ov_ticket_id, capture and regenerate transactionNumber
      * Pass transactionNumber to be stored in PAX Request
-     *
-     *
      */
-    private static ResponseMessage responseMessage;
-
-    //
-    private static double amount, tip;
-
-    //
-    public static boolean isVoid = false;
-
-    //
-    private static String paymentStatus;
-    private static String status;
-    public static String href;
 
     @Override
     public void handle(NetCommand command) {
 
-        //
         switch (command.getCommand().toString()) {
 
-            //
             case "SALE":
 
-                //
                 try {
+                    System.out.println("Handling SALE");
 
-                    //
+                    responseMessage = new ResponseMessage();
+                    paymentDetails = new PaymentDetails();
+
                     isComplete = false;
-                    signatureOk = false;
+                    isApproved = false;
+                    isVoid = false;
 
-                    //
+                    System.out.println("command.getResponseMessage() " + command.getResponseMessage());
                     responseMessage = new Gson().fromJson(command.getResponseMessage(), ResponseMessage.class);
-                    System.out.println("CommandListener setting href to: " + responseMessage.getUnique_ticket_id().substring(4));
+
+                    System.out.println("Got response: " + responseMessage);
                     href = responseMessage.getUnique_ticket_id().substring(4);
 
-                    /**
-                     * TODO: If !void -> Capture responseMessage.getTransactionNo() -> assign to CommandListener.transactionNumber
-                     *  TODO: Else -> Generate ECRRefNum from Invoice
-                     *  TODO: If makeSale() -> Assign transactionNumber to ECRRefNum for initial webhook transaction
-                     *  TODO: Else -> Assign transactionNumber to OrigECRNNum for follow-on webhook transaction, generate new ECRRefNum from Invoice
-                     */
+                    amount = (Double.parseDouble(responseMessage.getAmount()) / 100);
+                    amt = Integer.parseInt(responseMessage.getAmount());
+                    System.out.println("Amount (D) : " + amount);
+                    System.out.println("Amt (I) : " + amt);
 
-                    /**TODO: CommandListener.transactionNumber = Generate() -> insertPayment.setTransactionNo() -> PaymentRequest.setECRRefNum()
-                     * TODO: makeSale() -> PaymentResponse.getRefNum [PAX] -> insertPayment.setTransactionNo()
-                     * TODO: voidSale() -> responseMessage.getTransactionNo() [QP] -> CommandListener.transactionNumber
-                     *                  -> PaymentRequest.setOrigECRRefNum()
-                     *                  && CommandListener.transactionNumber = Generate() -> insertPayment.setTransactionNo() -> PaymentRequest.setECRRefNum()
-                     */
+                    paymentDetails.setTransactionNumber(InvoiceNumber.generateInvoiceNumber().substring(4));
+                    paymentDetails.setAmount(String.valueOf(amt));
+                    System.out.println("after paymentDetails.setAmount:" + paymentDetails.getAmount());
+                    if (paymentDetails.getOriginalAmount() == null) {paymentDetails.setOriginalAmount(responseMessage.getAmount());}
+                    System.out.println("after paymentDetails.setOriginalAmount:" + paymentDetails.getAmount());
+                    paymentDetails.setInvoice(InvoiceNumber.generateInvoiceNumber());
+                    paymentDetails.setHostReferenceNumber(responseMessage.getUnique_ticket_id().substring(4));
+                    paymentDetails.setReferenceNumber(responseMessage.getUnique_ticket_id());
 
-                    //
-                    amount = Double.parseDouble(responseMessage.getAmount());
-                    int amt = (int) amount;
-                    tip = Double.parseDouble(responseMessage.getTip());
-                    int tp = (int) tip;
+                    paymentDevice.makePayment(amt, 0, 0);
 
-                    //
-                    paymentDevice.makePayment(amt, tp, 0);
-
-                    /**
-                     *
-                     *
-                     *
-                     */
+                    System.out.println("Sure would like to set this amount here at: " + paymentDetails.getAmount());
 
                     // TODO: Filter results here to assign proper payment status
 
-                    System.out.println("We shouldn't be here until payment is processed...");
-                    //
-                    while(!isComplete){
-                        Thread.sleep(3000);
-                        System.out.println("Stalling....");
+                    while (!isComplete) {
+                        Thread.sleep(1000);
                     }
-                    if (isComplete && signatureOk) {
-                        paymentStatus = PaymentStatus.APPROVED.getValue();
-                        status = Status.PAID.getValue();
-                        if (isVoid) {
-                            retrofitCommandListenerResponseVoid();
-                        } else {
-                            retrofitCommandListenerResponse();
+
+                    if (isApproved) {
+                        paymentDetails.setDecision(PaymentStatus.APPROVED.getValue()); // TODO: This is also being assigned in PAXS300PaymentDevice class
+                        System.out.println("Comparing totals...");
+                        System.out.println("Due:" + paymentDetails.getAmount());
+                        System.out.println("Paid:" + paymentDetails.getApprovedAmount());
+                        if (Integer.parseInt(paymentDetails.getAmount()) > Integer.parseInt(paymentDetails.getApprovedAmount())) {
+                            paymentDetails.setStatus(Status.PARTIAL.getValue()); // TODO: It's not paid 'till it's paid...
                         }
-                    } else if(isComplete && signatureOk) {
-                        paymentStatus = PaymentStatus.APPROVED.getValue();
-                        status = Status.PAID.getValue();
+                        paymentDetails.setStatus(Status.PAID.getValue()); // TODO: It's not paid 'till it's paid...
+
                         if (isVoid) {
-                            retrofitCommandListenerResponseVoid();
+                            applyPaymentRemove();
                         } else {
-                            retrofitCommandListenerResponse();
+                            applyPaymentCapture();
+                            while (!isComplete) {
+                                Thread.sleep(1000);
+                            }
                         }
-                    } else if( isComplete && !signatureOk) {
-                        paymentStatus = PaymentStatus.FAILED.getValue();
-                        status = Status.DECLINED.getValue();
-                        if (isVoid) {
-                            retrofitCommandListenerResponseVoid();
-                        } else {
-                            retrofitCommandListenerResponse();
-                        }
+                    } else {
+                        paymentDetails.setDecision(PaymentStatus.FAILED.getValue());
+                        paymentDetails.setStatus(Status.DECLINED.getValue());
+                        applyPaymentCapture();
                     }
-//                    else {
-//                        paymentStatus = PaymentStatus.FAILED.getValue();
-//                        status = Status.DECLINED.getValue();
-//                    }
-
-                    //
-
-                //
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
                 break;
 
-            //
             case "VOID":
-
+                // TODO: Voids are currently processed as SALE by InterceptorClient
                 break;
 
-            //
             case "CANCEL":
-
-                //
                 try {
                     paymentDevice.cancelPayment();
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                 }
-                break;
-
-            //
             case "READY":
-                break;
-
-            //
             default:
         }
     }
 
-    // TODO: Extract this to a separate method
-    private void retrofitCommandListenerResponse() {
+    private void applyPaymentCapture() {
+        // TODO:  Add ov_ticket_id, webhook_id, rawData, device_id
 
-        System.out.println("retrofitting SALE");
+        /**
+         * (WH)ov_ticket_id -> (API)ticket_id -> (DB)pos_id -> (QP)ticket number
+         * (WH)unique_webhook_id -> (API)webhook_id -> (DB)omnivore_webhook_id -> (QP)---
+         * (WH)ov_payment_id -> (API)payment_id -> (DB)id_pay / client_id / omnivore_payment_id -> (QP)---
+         * (WH)unique_ticket_id -> (API)unique_ticket_id -> (DB)unique_ticket_id -> (QP)---
+         *
+         */
 
-        //
-        Map<String, String> options = new HashMap<>();
+        //Payment.insertPaymentCapture(responseMessage.getLocation_id(), responseMessage.getUnique_ticket_id(), transactionStatus, paymentDetails);
 
-        //
-        options.put("ov_location_id", responseMessage.getOv_location_id());
-        options.put("employee_id", "99"); // TODO: Source from POS
-        options.put("status", status);
-        options.put("transactionNo", InvoiceNumber.generateInvoiceNumber()); // TODO: Source from <OrigRefNum>
-        options.put("payment_status", paymentStatus);
-        options.put("type", responseMessage.getOv_tender_type_id());
-        options.put("unique_ticket_id", responseMessage.getUnique_ticket_id());
-        options.put("server", ""); // TODO: Source from POS
-        options.put("ov_ticket_id", responseMessage.getOv_ticket_id());
-        options.put("opened_at", responseMessage.getOpened_at());
-        options.put("ov_payment_id", responseMessage.getOv_payment_id());
-        options.put("amount", amount + "");
-        options.put("tip", tip + "");
-        options.put("unique_webhook_id", String.valueOf(responseMessage.getUnique_webhook_id()));
-        System.out.println(">>>"+options);
-
-        //
-        // Call<String> completionCall = PaymentAPI.postWebhookResponse(options);
-        Call<String> completionCall = PaymentAPI.postWebhookResponse(
-                responseMessage.getOv_location_id(), "99", status, responseMessage.getOv_tender_type_id(), responseMessage.getUnique_ticket_id(),
-                "", responseMessage.getOv_ticket_id(), responseMessage.getOpened_at(), responseMessage.getOv_payment_id(), responseMessage.getAmount(),
-                String.valueOf(tip/100), paymentStatus, href);
-
-        //
-        completionCall.enqueue(new Callback<>() {
-
-            //
-            @Override
-            public void onResponse(@NotNull Call<String> call, @NotNull Response<String> response) {
-                if (response.isSuccessful()) {
-                    JSONObject jsonObject = new JSONObject(response.body());
-                    System.out.println(jsonObject.optString("integrated_payments_id"));
-                    PaymentDao.setTicketData(jsonObject.optString("integrated_payments_id"), String.valueOf(responseMessage.getUnique_ticket_id()));
-
-
-                    // TODO: Pass success type to POS to handle
-                }
-            }
-
-            //
-            @Override
-            public void onFailure(@NotNull Call<String> call, @NotNull Throwable t) {
-                // TODO: Pass failure type to POS to handle
-                t.printStackTrace();
-            }
-        });
+        System.out.println("sure would like to set CL amount, it is:" + paymentDetails.getAmount());
+        Token.generateToken();
+        Payment.insertPaymentCapture(
+                Token.token, responseMessage.getLocation_id(), InterceptorClient.register.getSerialNumber(),
+                responseMessage.getOv_ticket_id(), String.valueOf(responseMessage.getUnique_webhook_id()), responseMessage.getOv_payment_id(),
+                responseMessage.getUnique_ticket_id(), paymentDetails);
     }
 
-    private void retrofitCommandListenerResponseVoid() {
-
-        System.out.println("retrofitting VOID");
-
-        //
-//        Map<String, String> options = new HashMap<>();
-
-        // Void 1
-//        options.put("id_pay", responseMessage.getPayment_unique_id());
-//        options.put("transactionNo", responseMessage.getTransactionNo());
-//        options.put("ref_num", href);
-//        options.put("pay_type", "ip");
-//        options.put("amount", amount + "");
-//        options.put("pin", "");
-//        options.put("from", "QuickPointDesktop");
-
-        // Void 2
-//        options.put("id_pay", responseMessage.getPayment_unique_id());
-//        options.put("transactionNo", responseMessage.getTransactionNo());
-//        options.put("pay_type", "ip");
-//        options.put("pin", "");
-//        options.put("amount", amount + "");
-//        options.put("from", "QuickPointDesktop");
-
-        // Void 3
-//        options.put("id_pay", responseMessage.getPayment_unique_id());
-//        options.put("amount", amount + "");
-//        options.put("pay_type", "ip");
-//        options.put("action", "void");
-//        options.put("pin", "");
-
-//        System.out.println("with these values: " + options);
-
-//        Call<String> completionCall = PaymentAPI.postWebhookRequestVoid(options);
-
-        // Void 1
-        //Call<String> completionCall = PaymentAPI.postWebhookRequestVoid1(responseMessage.getPayment_unique_id(), responseMessage.getTransactionNo(),
-//                                                                        href, "ip", amount + "", "", "QuickPointDesktop");
-
-        // Void 2
-        //Call<String> completionCall2 = PaymentAPI.postWebhookRequestVoid2(responseMessage.getPayment_unique_id(), responseMessage.getTransactionNo(),
-//                                                                        "ip", "", amount + "", "QuickPointDesktop");
-
-        // Void 3
-        //Call<String> completionCall3 = PaymentAPI.postWebhookRequestVoid3(responseMessage.getPayment_unique_id(), amount + "", "ip", "void", "");
-
-        // Void A
-        String id_pay = PaymentDao.getTicketData(String.valueOf(responseMessage.getUnique_ticket_id()));
-        Call<String> completionCall = PaymentAPI.postWebhookRequestVoid(id_pay);
-
-        //
-        completionCall.enqueue(new Callback<>() {
-
-            //
-            @Override
-            public void onResponse(@NotNull Call<String> call, @NotNull Response<String> response) {
-                if (response.isSuccessful()) {
-                    System.out.println(response);
-                    // TODO: Pass success type to POS to handle
-                    System.out.println("remove payment response: " + response);
-                }
-            }
-
-            //
-            @Override
-            public void onFailure(@NotNull Call<String> call, @NotNull Throwable t) {
-                // TODO: Pass failure type to POS to handle
-                t.printStackTrace();
-            }
-        });
-    }
-
-    public CommandListener(IPaymentDevice iPaymentDevice) {
-
-        //
-        paymentDevice = iPaymentDevice;
+    private void applyPaymentRemove() {
+        Token.generateToken();
+        Payment.insertPaymentRemove(Token.token, responseMessage.getLocation_id(), href);
     }
 }

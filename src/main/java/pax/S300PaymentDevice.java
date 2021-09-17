@@ -359,7 +359,7 @@
 //
 //        commSetting.setTimeOut("-1");
 //        commSetting.setDestIP("192.168.1.6");
-//        commSetting.setDestPort("10008");
+//        commSetting.setDestPort("10009");
 //        commSetting.setEnableProxy(false);
 //
 //        final PosLink posLink = new PosLink();

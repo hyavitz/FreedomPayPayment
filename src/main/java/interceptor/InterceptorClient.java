@@ -3,6 +3,7 @@ package interceptor;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import lombok.NonNull;
+import network.TransactionLog;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -44,8 +45,8 @@ public class InterceptorClient implements Client {
 
     private volatile boolean external;
 
-    private static final List<String> canceledList = new ArrayList<>(27);
-    private static final List<String> receivedList = new ArrayList<>();
+    public static final List<String> canceledList = new ArrayList<>(27);
+    public static final List<String> receivedList = new ArrayList<>();
 
     private static final Map<CommandListener, Boolean> listenerList = Collections.synchronizedMap(new WeakHashMap<>());
     private static volatile String currentWebhook = "";
@@ -57,9 +58,12 @@ public class InterceptorClient implements Client {
 
     @Deprecated
     public static InterceptorClient getInstance() {
+        System.out.println("<6><>Creating InterceptorClient instance");
         if (INSTANCE == null) {
+            System.out.println("<6.1><null>Creating InterceptorClient instance");
             synchronized (InterceptorClient.class) {
                 if (INSTANCE == null) {
+                    System.out.println("<6.2><null>Creating InterceptorClient instance");
                     INSTANCE = new InterceptorClient();
                 }
             }
@@ -128,11 +132,14 @@ public class InterceptorClient implements Client {
 
     @Override
     public InterceptorClient addCommandHandler(@NonNull CommandListener listener) {
+        System.out.println("<7><>addCommandHandler with listener[" + listener + "]");
         if (!listenerList.containsKey(listener)) {
+            System.out.println("<7.1><>adding as new listener");
             if (external) {
                 setExternal(false);
             }
             listenerList.put(listener, true);
+            System.out.println("<7.2><>canceledList.contains(currentWebhook) ?");
             if (canceledList.contains(currentWebhook)) {
                 NetCommand cancel = new NetCommand().setCommand(NetCommand.Command.CANCEL);
                 listener.handle(cancel);
@@ -155,15 +162,11 @@ public class InterceptorClient implements Client {
 
     @Override
     public void run() {
-        System.out.println("Started>>>");
 
         while (!shutdown) {
-            System.out.println("Shutdown?" + shutdown);
             try (Socket socket = connect()) {
-                System.out.println("Socket succeesfull");
                 try {
                     assert socket != null;
-                    System.out.println("Device Registered!");
 
                     PrintWriter output = new PrintWriter(socket.getOutputStream(), true);
                     BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -216,48 +219,66 @@ public class InterceptorClient implements Client {
                                     } catch (Exception e) {
                                     }
 
+                                    // If our canceled list does NOT yet contain this non-null webhook, we need to receive it -->
                                     if (!canceledList.contains(String.valueOf(responseMessage.getUnique_webhook_id()))
                                             && !(String.valueOf(responseMessage.getUnique_webhook_id()).equals(""))
-                                            && !(String.valueOf(responseMessage.getUnique_webhook_id()).isEmpty())) {
+                                            && !(String.valueOf(responseMessage.getUnique_webhook_id()).isEmpty())
+                                            && (String.valueOf(responseMessage.getUnique_webhook_id()) != null)) {
+
+                                        // This webhook should have already been received -->
+                                        System.out.println("Old webhook: " + currentWebhook + " is being replaced.");
                                         currentWebhook = String.valueOf(responseMessage.getUnique_webhook_id());
+                                        System.out.println("Current webhook: " + currentWebhook);
+
+                                        // First time around, these should be empty -->
+                                        System.out.println("Total received: " + receivedList);
+                                        System.out.println("Total canceled: " + canceledList);
+
                                     } else {
                                         command = null;
                                     }
 
+                                    // If our received list does NOT yet contain this non-null webhook, we need to add it
                                     if (!receivedList.contains(currentWebhook)
                                             && currentWebhook != null
                                             && !currentWebhook.equals("")
                                             && !currentWebhook.isEmpty()) {
-
+                                        System.out.println("Receiving...");
+                                        sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.RECEIVED).setUniqueId(currentWebhook));
                                         receivedList.add(currentWebhook);
-
+                                        System.out.println("Receiving webhook: " + currentWebhook);
+                                        System.out.println("Total received: " + receivedList);
                                     } else {
-
+                                        System.out.println("Waiting...");
                                         sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.WAITING));
-
+                                        System.out.println("Receiving webhook: " + currentWebhook);
+                                        System.out.println("Total received: " + receivedList);
                                         command = new NetCommand().setCommand(NetCommand.Command.PING);
                                         command.setResponseCode(jsonObject.optInt("ResponseCode", 0));
                                         command.setResponseMessage(jsonObject.optJSONObject("ResponseMessage").toString());
                                     }
 
-                                    sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.RECEIVED).setUniqueId(currentWebhook));
 
                                 } else if (jsonObject.optString("ResponseMessage", "").equalsIgnoreCase("New Connection")) {
-
                                     return;
 
                                 } else {
-
+                                    System.out.println("Waiting...");
                                     sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.WAITING));
 
                                     try {
+                                        System.out.println("Pinging...");
                                         command = GSON.fromJson(data, NetCommand.class);
                                         command.setCommand(NetCommand.Command.PING);
+
                                     } catch (Exception e) {
+                                        System.out.println("Catching...");
                                     }
                                 }
                             }
+
                         } catch (Exception e) {
+                            System.out.println("Catching...");
                         }
 
                         if (command != null) {
@@ -287,6 +308,8 @@ public class InterceptorClient implements Client {
                                     break;
 
                                 case CANCEL:
+                                    System.out.println("Canceling...");
+
                                     NetCommand cancel = new NetCommand().setCommand(NetCommand.Command.CANCEL);
 
                                     if (!cancel.getWebhookId().isEmpty()) {
@@ -313,11 +336,15 @@ public class InterceptorClient implements Client {
 
                                 case RECEIPT:
                                     try {
+                                        System.out.println("CASE RECEIPT");
                                         sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.RECEIVED).setUniqueId(command.getUniqueId()));
+                                        System.out.println("Receiving " + command.getUniqueId());
                                         for (CommandListener listener : listenerList.keySet()) {
                                             listener.handle(command);
                                         }
+
                                     } catch (Exception e) {
+                                        System.out.println("Catching...");
                                     }
                                     break;
 
@@ -327,8 +354,13 @@ public class InterceptorClient implements Client {
                                 case VOID:
                                 case REFUND:
                                 case SALE:
+                                    System.out.println("IC TRANSACTION START?");
+                                    TransactionLog.generateLog("Start Transaction", "Interceptor Client");
+
                                 default:
-                                    sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.RECEIVED).setUniqueId(currentWebhook));
+//                                    System.out.println("Receiving...");
+//                                    sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.RECEIVED).setUniqueId(currentWebhook));
+                                    System.out.println("Waiting...");
                                     sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.WAITING));
 
                                     for (CommandListener listener : listenerList.keySet()) {
@@ -345,22 +377,30 @@ public class InterceptorClient implements Client {
                                         }
 
                                         if (!canceledList.contains(temp.optString("unique_webhook_id", ""))) {
-                                            sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.RECEIVED)
-                                                    .setUniqueId(temp.optString("unique_webhook_id", "")));
-
+                                            System.out.println("IC TRANSACTION FINISH?");
+                                            TransactionLog.generateLog("Finish Transaction", "Interceptor Client");
+//                                            System.out.println("Receiving...");
+//                                            sendMessageToServer(output, new NetCommand().setCommand(NetCommand.Command.RECEIVED)
+//                                                    .setUniqueId(temp.optString("unique_webhook_id", "")));
+                                            System.out.println("Assigning new value to currentWebhook...");
                                             currentWebhook = temp.optString("unique_webhook_id", "");
+                                            System.out.println("Current webhook: " + currentWebhook);
+                                            System.out.println("Adding webhook to canceled: " + currentWebhook);
                                             canceledList.add(currentWebhook);
+                                            System.out.println("Canceled list contains: " + canceledList);
                                         }
 
                                     } catch (Exception e) {
+                                        System.out.println("Catching...");
                                     }
-
                                     break;
                             }
 
                             try {
                                 Thread.sleep(2000);
+
                             } catch (Exception ignore) {
+                                System.out.println("Catching...");
                             }
 
                         } else {
@@ -372,25 +412,27 @@ public class InterceptorClient implements Client {
                                 socket.setSoTimeout(45000);
 
                             } else {
+                                System.out.println("Elsing...");
                                 break;
                             }
                         }
                     }
 
                 } catch (Exception e) {
+                    System.out.println("Catching...");
                 }
 
             } catch (Exception e) {
-                System.out.println("Socket didn't work");
+                System.out.println("Catching...");
             }
 
             try {
                 Thread.sleep(3000);
 
             } catch (Exception e) {
+                System.out.println("Catching...");
             }
         }
-        System.out.println("Shutdown? " + shutdown);
     }
 
     @Override
@@ -407,43 +449,35 @@ public class InterceptorClient implements Client {
     }
 
     /**
-     * Loop through the different servers and attempt to connect
+     * Attempt to connect from iteration of available servers
      *
      * @return The opened socket if successful, else null
      */
     private Socket connect() {
 
-        // TODO: Configure with correct live servers
+        // TODO: Supply live servers
         List<String> servers = new ArrayList<>();
         servers.add("softpointdev.com");
         servers.add("softpointdev.com");
         servers.add("softpointdev.com");
 
-        System.out.println("We try to make socket");
-
         for (String host : servers) {
             Socket socket = connectServer(host);
-            System.out.println("We probably didn't get this far but is we did " + socket);
             if (socket != null) {
                 try {
-                    System.out.println("If we're not null we should e here");
                     PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
                     BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-                    System.out.println("If we got all the way here, wtf what with this " + socket + " and this " + out + " and this " + in );
                     if (registerDevice(socket, out, in)) {
-                        System.out.println("SOCKET");
                         return socket;
                     }
-                    System.out.println("NO SOCKET");
 
                 } catch (Exception e) {
-                    System.out.println("WE GOT CAUGHT" + e.getMessage());
                     return null;
                 }
             }
         }
-        throw new NullPointerException("\nSocket unable to connect - Null");
+        throw new NullPointerException("\nSocket Connection Failed");
     }
 
     /**
@@ -476,7 +510,6 @@ public class InterceptorClient implements Client {
     boolean registerDevice(Socket socket, PrintWriter out, BufferedReader in) throws SocketException {
 
         socket.setSoTimeout(5000);
-        System.out.println("REGISTER" + register);
         sendMessageToServer(out, register);
         BasicResponse data = getMessageFromServer(in, BasicResponse.class);
         socket.setSoTimeout(45000);
@@ -491,49 +524,49 @@ public class InterceptorClient implements Client {
     /**
      * Converts an object to a JSON string and forwards that string to #sendMessageToServer(String)
      *
-     * @param output  The PrintWriter to write the message to
+     * @param out  The PrintWriter to write the message to
      * @param message The object to send
      */
-    private void sendMessageToServer(@NonNull PrintWriter output, @NonNull Object message) {
-        sendMessageToServer(output, GSON.toJson(message));
+    private void sendMessageToServer(@NonNull PrintWriter out, @NonNull Object message) {
+        sendMessageToServer(out, GSON.toJson(message));
     }
 
     /**
      * Sends a given message to the given PrintWriter. This method mainly is used after an Object is
      * convert into JSON instead of having conversion code all over.
      *
-     * @param output  The PrintWriter to write the message to
+     * @param out  The PrintWriter to write the message to
      * @param message The object to send
      */
-    private void sendMessageToServer(@NonNull PrintWriter output, @NonNull String message) {
-        output.println(message);
+    private void sendMessageToServer(@NonNull PrintWriter out, @NonNull String message) {
+        out.println(message);
     }
 
     /**
-     * Gets a message from the Server and parses it to be the requested object.
+     * Get message from server and cast it to requested object
      *
-     * @param input The Reader to read from
+     * @param in The Reader to read from
      * @param klass The class we are attempting to parse the data to
      * @param <E>   Return type of the class we are parsing to
      * @return An object of the requested type if successful or null
      */
-    private <E> E getMessageFromServer(@NonNull BufferedReader input, @NonNull Class<E> klass) {
+    private <E> E getMessageFromServer(@NonNull BufferedReader in, @NonNull Class<E> klass) {
         try {
-            return GSON.fromJson(getMessageFromServer(input), klass);
+            return GSON.fromJson(getMessageFromServer(in), klass);
         } catch (JsonSyntaxException e) {
             return null;
         }
     }
 
     /**
-     * Gets a message from the Server as a string.
+     * Get message from server as string
      *
-     * @param input The Reader to read from
+     * @param in The Reader to read from
      * @return The String returned from the server
      */
-    private String getMessageFromServer(@NonNull BufferedReader input) {
+    private String getMessageFromServer(@NonNull BufferedReader in) {
         try {
-            return input.readLine();
+            return in.readLine();
         } catch (IOException e) {
             return null;
         }

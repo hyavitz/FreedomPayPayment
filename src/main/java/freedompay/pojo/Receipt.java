@@ -37,7 +37,7 @@ public class Receipt {
     private String purchaseApprovedCardEntry;
     private String transactionState;
 
-    public Receipt(String invoiceNumber, Items items, double amount, double tax, double tip, Response response) {
+    public Receipt(String invoiceNumber, Items items, double amount, double tax, double tip, FreedomPayTransactionResponse response) {
 
         this.vendorName = "Discovery Cafe";
         this.invoiceNumber = invoiceNumber;
@@ -56,17 +56,17 @@ public class Receipt {
         double itemPrice = 0.0;
 
         String padding;
-        if (items != null) {
-            for (Item item : items.items) {
-                if (item != null) {
-                    padding = addPadding(Math.round((44 - item.getProductName().length())));
-                    itemDetails.append(item.getQuantity() + "\t\t" + item.getProductName() + "\t\t" + "$" + item.getUnitPrice() + "\n");
-                    itemPrice += (Double.parseDouble(item.getUnitPrice().replace("$", "")) * Double.parseDouble(item.getQuantity()));
-                }
-            }
-        } else {
-            itemDetails.append("Nothing here...\n");
-        }
+//        if (items != null) {
+//            for (Item item : items.items) {
+//                if (item != null) {
+//                    padding = addPadding(Math.round((44 - item.getProductName().length())));
+//                    itemDetails.append(item.getQuantity() + "\t\t" + item.getProductName() + "\t\t" + "$" + item.getUnitPrice() + "\n");
+//                    itemPrice += (Double.parseDouble(item.getUnitPrice().replace("$", "")) * Double.parseDouble(item.getQuantity()));
+//                }
+//            }
+//        } else {
+//            itemDetails.append("Nothing here...\n");
+//        }
 
         this.purchaseApprovedDecision = response.getMessage();
         this.purchaseApprovedAmount = response.getApprovedAmount();

@@ -1,0 +1,11 @@
+<String>&lt;POSResponse>&lt;RequestGuid>2983e3db-3165-4a4d-82d6-5f520d410cf0&lt;/RequestGuid>&lt;TransactionId>00000000000000000043&lt;/TransactionId>&lt;RequestId>00000000000000000043&lt;/RequestId>&lt;ApprovedAmount>0&lt;/ApprovedAmount>&lt;MerchantReferenceCode>2ee8484096c2449fb2b275029a84299f&lt;/MerchantReferenceCode>&lt;DCCAccepted>false&lt;/DCCAccepted>&lt;ReceiptText>*************** PURCHASE ***************&#xd;
+                DECLINED&#xd;
+&#xd;
+Total:                            $30.00&#xd;
+&#xd;
+Card Type:     ******&#xd;
+Card Entry:    MANUAL&#xd;
+Acct #:        ****************&#xd;
+&#xd;
+&lt;/ReceiptText>&lt;PinVerified>false&lt;/PinVerified>&lt;DeviceVerified>false&lt;/DeviceVerified>&lt;SignatureRequired>true&lt;/SignatureRequired>&lt;Decision>R&lt;/Decision>&lt;ErrorCode>3030&lt;/ErrorCode>&lt;Message>Lane Timeout&lt;/Message>&lt;Brand>XX&lt;/Brand>&lt;/POSResponse>&#xd;
+</String>

@@ -1,11 +1,9 @@
 package pax.payment;
 
-import com.pax.poslink.PaymentResponse;
-import com.pax.poslink.PosLink;
+import lombok.Data;
 
+@Data
 public class PaxS300PaymentResponse {
-
-    /** RESPONSE */
 
     private String signatureResponse;
     private String plCardPresent;
@@ -43,7 +41,7 @@ public class PaxS300PaymentResponse {
     private String phoneNum;
 
     // trace information
-    private String ecrRefNum; // TODO: Generate from POS and assign to webhook transactionNo for follow-on transactions (PaymentRequest -> PaymentResponse)
+    private String ecrRefNum;
 
     // avs information
     private String avsMessage;
@@ -144,18 +142,4 @@ public class PaxS300PaymentResponse {
     private String customerData;
     private String userId;
     private String vehicleId;
-
-    private static final PaymentResponse paymentResponse = new PaymentResponse();
-
-    public static PaymentResponse getPaymentResponse(PosLink posLink) {
-
-        String extraData = posLink.PaymentResponse.ExtData;
-
-
-
-
-
-
-        return paymentResponse;
-    }
 }

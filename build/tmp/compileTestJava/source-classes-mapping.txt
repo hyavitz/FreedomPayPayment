@@ -1,2 +1,2 @@
-paxs300/PaxS300PaymentDeviceTest.java
- paxs300.PaxS300PaymentDeviceTest
+pax/PaxS300PaymentDeviceTest.java
+ pax.PaxS300PaymentDeviceTest

@@ -3,7 +3,8 @@ package interceptor;
 public enum Status {
     TIP_ADJUST ("TipAdjust"),
     PAID ("Paid"),
-    DECLINED ("Declined");
+    DECLINED ("Declined"),
+    PARTIAL ("Partial");
 
     private String value;
 

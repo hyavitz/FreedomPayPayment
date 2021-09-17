@@ -2,6 +2,7 @@ package config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import data.Constant;
 import interceptor.InterceptorFactory;
 import interceptor.OkHttpClientFactory;
 import okhttp3.Interceptor;
@@ -10,6 +11,8 @@ import retrofit2.Call;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 import retrofit2.converter.scalars.ScalarsConverterFactory;
+
+import java.util.Map;
 
 public class RegisterDeviceApiController {
 
@@ -29,7 +32,7 @@ public class RegisterDeviceApiController {
                             .create();
 
                     retrofit = new Retrofit.Builder()
-                            .baseUrl("https://softpointdev.com/") // TODO: Consolidate constants
+                            .baseUrl(Constant.HOST)
                             .addConverterFactory(ScalarsConverterFactory.create())
                             .addConverterFactory(GsonConverterFactory.create(gson))
                             .client(okHttpClient)
@@ -45,14 +48,12 @@ public class RegisterDeviceApiController {
         return apiRetrofit.create(RegisterDeviceApiRequest.class);
     }
 
-    public static Call<String> getRegisterDeviceApiCall(String locationId, String token, String deviceType, String deviceId, String application, String appVersion) {
+    public static Call<String> getRegisterDeviceApiCall(Map<String, String> options) {
+        return getRegisterDeviceApiRequest().registerDevice(options);
+    }
 
-        System.out.println(locationId);
-        System.out.println(token);
-        System.out.println(deviceType);
-        System.out.println(deviceId);
-        System.out.println(application);
-        System.out.println(appVersion);
-        return getRegisterDeviceApiRequest().registerDevice(locationId, token, deviceType, deviceId, application, appVersion);
+    public static Call<String> getRegisterDeviceApiCall(String token, String locationId, String deviceId, String deviceType, String application, String appVersion) {
+        System.out.println("Calling register device with : " + locationId + " token " + token + " device type: " + deviceType + " id " + deviceId + " application "+ application);
+        return getRegisterDeviceApiRequest().registerDevice(token, locationId, deviceId, deviceType, application, appVersion);
     }
 }

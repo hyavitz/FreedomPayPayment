@@ -2,6 +2,7 @@ package payment;
 
 import freedompay.FreedomPayPaymentDevice;
 import freedompay.pojo.Items;
+import pax.PAXS300PaymentDevice;
 import worldpay.WorldPayPaymentDevice;
 
 import javax.swing.*;
@@ -273,10 +274,8 @@ public class PaymentGUI {
                 // Submit payment
                 try {
                     submitPayment();
-                } catch (IOException ioException) {
+                } catch (IOException | InterruptedException ioException) {
                     ioException.printStackTrace();
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
                 }
             }
         });
@@ -462,10 +461,10 @@ public class PaymentGUI {
                 paymentDevice = new WorldPayPaymentDevice();
                 break;
             case "FreedomPay":
-                paymentDevice = new FreedomPayPaymentDevice();
+                paymentDevice = FreedomPayPaymentDevice.getFreedomPayPaymentDeviceInstance();
                 break;
             case "PAX":
-                paymentDevice = new pax.PaxS300PaymentDevice();
+                paymentDevice = new PAXS300PaymentDevice();
                 break;
         }
     }

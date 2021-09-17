@@ -24,16 +24,14 @@ public class TokenStore {
     }
 
     public static String getToken(String customerCode) {
-        BufferedReader reader;
-        try {
-            reader = new BufferedReader(new FileReader(customerCode + ".txt"));
-            System.out.println("Getting token from " + customerCode + ".txt");
-            if (reader.read() != -1) {
-                return reader.readLine();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        try (BufferedReader reader = new BufferedReader(new FileReader(customerCode + ".txt"));) {
+//            System.out.println("Getting token from " + customerCode + ".txt");
+//            if (reader.read() != -1) {
+//                return reader.readLine();
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
         return null;
     }
 }

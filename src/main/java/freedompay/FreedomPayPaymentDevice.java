@@ -3,20 +3,26 @@ package freedompay;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import config.DeviceConfig;
-import payment.InvoiceNumber;
+import freedompay.constants.Transaction;
 import freedompay.network.FreedomPayConnectionHelper;
 import freedompay.network.FreedomPayDataStreamManager;
-import freedompay.pojo.*;
+import freedompay.pojo.FreedomPayTransactionRequest;
+import freedompay.pojo.FreedomPayTransactionResponse;
+import freedompay.pojo.Items;
+import freedompay.pojo.Receipt;
 import interceptor.CommandListener;
 import payment.IPaymentDevice;
+import payment.InvoiceNumber;
 import payment.PaymentDetails;
 import payment.PaymentUtil;
 import printer.NetworkPrinter;
 import printer.Printable;
 import printer.PrinterService;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -46,563 +52,479 @@ public class FreedomPayPaymentDevice implements IPaymentDevice {
      * @update 6/25/21
     */
 
-    // Declare connection objects
-    private static FreedomPayConnectionHelper fpConnection;
+    private static HttpURLConnection freedomPayConnectionHelper;
+    private static FreedomPayDataStreamManager freedomPayDataStreamManager;
+    private static FreedomPayPaymentDevice freedomPayPaymentDevice;
 
-    static {
-        try {
-            fpConnection = FreedomPayConnectionHelper.getFPConnectionInstance();
-        } catch (IOException e) {
-            e.printStackTrace();
+    private FreedomPayPaymentDevice(){}
+
+    public static FreedomPayPaymentDevice getFreedomPayPaymentDeviceInstance() throws IOException {
+        if (freedomPayPaymentDevice == null) {
+            freedomPayPaymentDevice = new FreedomPayPaymentDevice();
         }
+        freedomPayConnectionHelper = FreedomPayConnectionHelper.getFreedomPayConnectionInstance();
+        freedomPayDataStreamManager = FreedomPayDataStreamManager.getFreedomPayDataStreamManagerInstance();
+        return freedomPayPaymentDevice;
     }
 
-    private static FreedomPayDataStreamManager fpDataStream = FreedomPayDataStreamManager.getFPDataStreamInstance();
+    public static String invoice;
 
-    // TODO: Source from API call
-    // Sourced from DeviceConfig class which pulls data from freedompay_config.txt file configured at integration
-    private final static DeviceConfig deviceConfig = new DeviceConfig("./config/freedompay_config.txt");
-
-    // Assign config values from device config object
-    private static final long storeId = deviceConfig.STORE_ID; // FP issued credentials
-    private static final long terminalId = deviceConfig.TERMINAL_ID; // FP issued credentials
-    private static final int laneId = deviceConfig.LANE_ID; // TID from POI
-    private static final String clientEnvironment = deviceConfig.CLIENT_ENVIRONMENT; // Dev, Prod, etc
-    public static final String invoice = InvoiceNumber.generateInvoiceNumber(); // ex: date + incremental
-
-    // Timeout
     private static final int TIMEOUT = 30000;
-    private static long lastTime = 0L;
+    private static long lastPing;
+    private static Boolean isGood;
 
-    // Declare optional fields for follow-on requests
     private static String requestId;
     private static String merchantReferenceCode;
 
-    // Declare optional token values
     private static boolean isToken = true;
     private static boolean createToken = false;
     private static String token;
 
-    // Payment details
-    private static PaymentDetails paymentDetails;
     private static String decision;
     private static String message;
 
-    // Declare request and response objects
-    private static Request posRequest;
-    private static Response posResponse;
+    private static FreedomPayTransactionRequest freedomPayTransactionRequest;
+    private static FreedomPayTransactionResponse freedomPayTransactionResponse;
     private static String responseXML;
     private static byte[] requestBytes;
 
-    // Declare charge values
     private static double amountDouble, tipDouble, taxDouble;
     private static int amountInteger, tipInteger, taxInteger;
 
-    // TODO: Create builder for these...
     private static Items items;
 
-    // Create ISO date object for customer data
     private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
-    private final String dateAsISO = df.format(new Date());
+    private static final String dateAsISO = df.format(new Date());
 
-    // Generate unique transaction id
-    private String getMerchantReferenceCode() {
-
-        //
-        return UUID.randomUUID().toString().replace("-", "");
-    }
-
-    //
-    public FreedomPayPaymentDevice() throws IOException {}
+    private static String getMerchantReferenceCode() { return UUID.randomUUID().toString().replace("-", ""); }
 
     @Override
-    public void makePayment(int amt, int tp, int tx) throws IOException {
+    public void makePayment(int amount, int tip, int tax) throws IOException, InterruptedException {
 
-        //
-        fpConnection = FreedomPayConnectionHelper.getFPConnectionInstance();
-        fpDataStream = FreedomPayDataStreamManager.getFPDataStreamInstance();
+        if (amount <= 0) {
+            createToken();
+        } else {
+            amountInteger = amount;
+            tipInteger = tip;
+            taxInteger = tax;
+            executeTransaction(Transaction.SALE);
+        }
 
-        // Assign initial amount
-        amountInteger = amt;
-        tipInteger = tp;
-        taxInteger = tx;
-
-        // Build item data
+        // TODO: Source from API call
         items = ItemData.getItemData();
-
-        // Clear previous data for transaction that don't need it
-        // invoice, merchantReferenceCode, requestId, token, isToken, createToken
-
-
-        //
-        execute("Sale");
     }
 
     @Override
-    public void cancelPayment() throws IOException {
+    public void cancelPayment() throws IOException, InterruptedException {
 
-        //
-        fpConnection = FreedomPayConnectionHelper.getFPConnectionInstance();
-        fpDataStream = FreedomPayDataStreamManager.getFPDataStreamInstance();
-
-        //
-        execute("Cancel");
+        executeTransaction(Transaction.CANCEL);
     }
 
     @Override
-    public void voidPayment() throws IOException {
+    public void voidPayment() throws IOException, InterruptedException {
 
-        //
-        fpConnection = FreedomPayConnectionHelper.getFPConnectionInstance();
-        fpDataStream = FreedomPayDataStreamManager.getFPDataStreamInstance();
-
-        //
-        execute("Void");
+        executeTransaction(Transaction.VOID);
     }
 
     @Override
-    public void refundPayment(int amt) throws IOException {
+    public void refundPayment(int amount) throws IOException, InterruptedException {
 
-        //
-        fpConnection = FreedomPayConnectionHelper.getFPConnectionInstance();
-        fpDataStream = FreedomPayDataStreamManager.getFPDataStreamInstance();
-
-        //
-        amountInteger = amt;
-
-        //
-        execute("Refund");
+        amountInteger = amount;
+        executeTransaction(Transaction.REFUND);
     }
 
     @Override
-    public void createToken() throws IOException {
+    public void createToken() throws IOException, InterruptedException {
 
-        //
         amountInteger = taxInteger = tipInteger = 0;
         createToken = true;
         isToken = false;
 
-        //
-        execute("Auth");
+        executeTransaction(Transaction.AUTH);
     }
 
-    //
-    private void setToken() {
+    // TODO: Source from API call
+    private void setToken() { token = TokenStore.getToken(generateCustomerNumber()); }
 
-        //
-        token = TokenStore.getToken(generateCustomerNumber());
-    }
+    private void executeTransaction(Transaction transaction) throws IOException, InterruptedException {
 
-    // Called by every transaction method.
-    private boolean execute(String req) throws IOException {
+        freedomPayTransactionRequest = new FreedomPayTransactionRequest();
+        freedomPayTransactionResponse = new FreedomPayTransactionResponse();
 
-        // Create new Response object for each transaction.
-        posRequest = new Request();
-        posResponse = new Response();
+        // TODO: Source from config - refactor into method
+        freedomPayTransactionRequest.setStoreId("1496617013");
+        freedomPayTransactionRequest.setTerminalId("2510855011");
+        freedomPayTransactionRequest.setLaneId("0");
+        freedomPayTransactionRequest.setClientEnvironment("QuickPoint");
 
-        // Assign values for current PaymentDevice instance
-        posRequest.setStoreId(String.valueOf(storeId));
-        posRequest.setTerminalId(String.valueOf(terminalId));
-        posRequest.setLaneId(String.valueOf(laneId));
-        posRequest.setClientEnvironment(clientEnvironment);
-
-        //
-        if (merchantReferenceCode == null
-                || merchantReferenceCode.isEmpty()
-                || merchantReferenceCode.equals("")) {
+        if (merchantReferenceCode == null || merchantReferenceCode.isEmpty()) {
             merchantReferenceCode = getMerchantReferenceCode();
         }
-        posRequest.setMerchantReferenceCode(merchantReferenceCode);
+        freedomPayTransactionRequest.setMerchantReferenceCode(merchantReferenceCode);
 
-        //
-        setCustomerData();
+        // TODO: Use payment details class to set customer details here ->
+        /**
+         *
+         * Items, customer code, token, invoice?
+         * freedomPayTransactionRequest.setItems(ItemData.getItemData());
+         *
+         */
 
-        //
         if (isToken) {
             setToken();
             if (token != null) {
-                posRequest.setCardNumber(token);
+                freedomPayTransactionRequest.setCardNumber(token);
             }
             isToken = false;
         }
 
-        //
         if (createToken) {
-            posRequest.setTokenType("6");
+            freedomPayTransactionRequest.setTokenType("6");
             createToken = false;
         }
 
-        //
-        posRequest.setItems(ItemData.getItemData());
+        if (invoice == null || invoice.equals("")) {
+            invoice = InvoiceNumber.generateInvoiceNumber();
+        }
 
-        //
-        posRequest.setInvoiceNumber(invoice);
-        posRequest.setAllowPartial("Y");
+        freedomPayTransactionRequest.setInvoiceNumber(invoice);
+        freedomPayTransactionRequest.setAllowPartial("Y");
 
-        // Assign request type
-        posRequest.setRequestType(req);
+        freedomPayTransactionRequest.setRequestType(transaction.toString().charAt(0) + transaction.toString().substring(1).toLowerCase());
 
-        // Route request type and pass requestId, merchantReferenceCode, or token as needed
-        switch (req) {
+        switch (transaction.toString()) {
 
-            // Authorize card for future capture transaction or token generation
-            case "Auth":
-
-            // Auth and Capture in single transaction
-            case "Sale":
-
-                // Assign single charges
+            case "SALE":
                 setAmountValues(amountInteger, taxInteger, tipInteger);
+                if (!getTransactionResponse()) {
+                    System.out.println("case Sale getTransactionResponse() was false");
+                    cancelPayment();
+                }
+                break;
 
-                //
-                return getResponse();
+            case "PRE_AUTH":
 
-            // Close sale on previous auth transaction
-            case "Capture":
-
-                // Assign previous charge, tip, and tax -> Convert from cents
+            // TODO: Source follow-on data from API call
+            case "AUTH":
                 setAmountValues(amountInteger, taxInteger, tipInteger);
+                if (requestId != null && !requestId.isEmpty()) {
+                    freedomPayTransactionRequest.setRequestId(requestId);
+                }
+                if (!getTransactionResponse()) {
+                    cancelPayment();
+                }
+                break;
 
-                // Assign previous request id
-                if (requestId != null
-                        && !requestId.isEmpty()
-                        && !requestId.equals("")) {
-                    posRequest.setRequestId(requestId);
+            case "POST_AUTH":
+
+            case "CANCEL":
+                if (!getTransactionResponse()) {
+                    System.out.println("Cancel Transaction failed - No response");
+                }
+                break;
+
+            // TODO: Source follow-on data from API call
+            case "VOID":
+                if (requestId != null && !requestId.isEmpty()) {
+                    freedomPayTransactionRequest.setRequestId(requestId);
                 }
 
-                //
-                return getResponse();
+                if (!getTransactionResponse()) {
+                    cancelPayment();
+                }
+                break;
 
-            // If card present or request id present
-            case "Refund":
+            case "RETURN":
 
-                // Assign previous amount
+            // TODO: Source follow-on data from API call
+            case "REFUND":
                 setAmountValues(amountInteger, 0, 0);
 
-                // Assign previous request id
-                if (requestId != null
-                        && !requestId.isEmpty()
-                        && !requestId.equals("")) {
-                    posRequest.setRequestId(requestId);
+                if (requestId != null && !requestId.isEmpty()) {
+                    freedomPayTransactionRequest.setRequestId(requestId);
                 }
 
-                //
-                return getResponse();
-
-            // If POS has obtained response from previous transaction
-            case "Void":
-
-                // Assign previous request id
-                if (requestId != null
-                        && !requestId.isEmpty()
-                        && !requestId.equals("")) {
-                    posRequest.setRequestId(requestId);
+                if (!getTransactionResponse()) {
+                    cancelPayment();
                 }
+                break;
 
-                //
-                return getResponse();
-
-            // If POS has not obtained response from previous transaction
-            case "Cancel":
-
-                //
-                return getResponse();
+            case "TOKEN":
+            default:
         }
-
-        // Assume execute failed if not handle by switch
-        return false;
     }
 
-    // Called by execute() with requestType argument.
-    private boolean getResponse() {
+    private Boolean getTransactionResponse() throws IOException, InterruptedException {
 
-        // Send request package and return response package
-        try {
+        String requestXML = serializeToXmlString(freedomPayTransactionRequest);
+        System.out.println("Request XML: " + requestXML);
 
-            // Package Request object to XML String
-            String requestXML = serializeToXmlString(posRequest);
+        responseXML = null;
 
-            // Serialize XML String to byte array
-            requestBytes = serializeToByteArray(requestXML);
+        requestBytes = serializeToByteArray(requestXML);
 
-            // Reset Timeout
-            lastTime = System.currentTimeMillis();
-            System.out.println("Start Time: " + lastTime);
+        lastPing = System.currentTimeMillis();
+        System.out.println("Start Time: " + lastPing);
 
-            // Open connection stream, send byte array, capture response
-            new Thread(() -> getData()).start();
+        // TODO: This connection request might not work in a thread.
+//        Thread transactionThread = new Thread(
+//        );
+//        transactionThread.start();
+        getTransactionResponseData(); // TODO: This is the blocking method
 
-            //
+        Thread timerThread = new Thread(() -> {
+
+            isGood = true;
+
+            // TODO: Increment counter here in while loop;
+            //while (responseXML == null || responseXML.isEmpty()) {
             while (responseXML == null) {
-                System.out.print(".");
-                if ((System.currentTimeMillis() - lastTime) > TIMEOUT) {
-                    System.out.println("Time Out!");
-                    return false;
+                System.out.println("yeah?->" + (lastPing > (System.currentTimeMillis() - 10000000)));
+                System.out.println("Top of while loop: " + freedomPayTransactionRequest.getRequestType() + " : " + responseXML);
+                System.out.println("counter-length: " + (System.currentTimeMillis() - 10000));
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("Bottom of while loop: " + freedomPayTransactionRequest.getRequestType() + " : " + responseXML);
+                if ((System.currentTimeMillis() - lastPing) > TIMEOUT) {
+                    System.out.println("ResponseXML should be still be null: " + (responseXML == null));
+                    System.out.println("Transaction Request Timeout, let's cancel this bitch.");
+                    //transactionThread.interrupt();
+                    isGood = false;
+                    break;
                 }
             }
+        });
+        System.out.println("isGood: " + isGood);
+        timerThread.start();
 
-            //
-            System.out.println("End Time: " + System.currentTimeMillis());
-            System.out.println("Total Time: " + (System.currentTimeMillis() - lastTime));
+        while (isGood == null) {
+                Thread.sleep(3000);
+            System.out.println("isGood: " + isGood);
+        }
+        System.out.println("isGood: " + isGood);
+        wrapUp();
+        return isGood;
+    }
 
-            //
-            System.out.println("Token : " + isToken + " : " + token);
-            System.out.println("Request ID : " + requestId);
-            System.out.println("Merchant Reference Code : " + merchantReferenceCode);
+    private boolean forgetIt() throws IOException {
+        System.out.println("End Time: " + System.currentTimeMillis());
+        System.out.println("Total Time: " + (System.currentTimeMillis() - lastPing));
+        return true;
+    }
 
-            //
-            System.out.println(responseXML);
+    private boolean wrapUp() throws IOException, InterruptedException {
+        System.out.println("End Time: " + System.currentTimeMillis());
+        System.out.println("Total Time: " + (System.currentTimeMillis() - lastPing));
 
-            // Deserialize and construct Response object from data
-            posResponse = deserializeFromXmlString(responseXML);
+        // TODO: Wrap up?
+        // TODO: Source follow-on request data from API call
+        System.out.println("----------------------------------->\n");
+        System.out.println("Token : " + isToken + " : " + token);
+        System.out.println("Request ID : " + requestId);
+        System.out.println("Merchant Reference Code : " + merchantReferenceCode);
+        System.out.println("Response XML: " + responseXML);
+        System.out.println("<----------------------------------\n");
 
-            // Token
-            if (posResponse.getToken() != null
-                    && !posResponse.getToken().isEmpty()
-                    && !posResponse.equals("")) {
-                createToken = false;
-                isToken = true;
-                token = posResponse.getToken();
-                TokenStore.storeToken(generateCustomerNumber(), token);
-            }
+        freedomPayTransactionResponse = deserializeFromXmlString(responseXML);
 
-            // Merchant Reference Code
-            if (posResponse.getMerchantReferenceCode() != null
-                    && !posResponse.getMerchantReferenceCode().isEmpty()
-                    && !posResponse.getMerchantReferenceCode().equals("")) {
-                merchantReferenceCode = posResponse.getMerchantReferenceCode();
-            }
+        /**
+         * TODO: Evaluate and populate using payment details class
+         */
 
-            // Request ID
-            if (posResponse.getRequestId() != null
-                    && !posResponse.getRequestId().isEmpty()
-                    && !posResponse.getRequestId().equals("")) {
-                requestId = posResponse.getRequestId();
-            }
-
-            // Approved Amount
-            if (posResponse.getApprovedAmount() != null
-                    && !posResponse.getApprovedAmount().isEmpty()
-                    && !posResponse.getApprovedAmount().equals("")) {
-                amountDouble = Double.parseDouble(posResponse.getApprovedAmount());
-            }
-
-            // Approved Tip
-            if (posResponse.getTipAmount() != null
-                    && !posResponse.getTipAmount().isEmpty()
-                    && !posResponse.getTipAmount().equals("")) {
-                tipDouble = Double.parseDouble(posResponse.getTipAmount());
-            }
-
-            // Get decision code from Response object -> prompt POS for appropriate action
-            if (posResponse.getDecision() != null
-                    && !posResponse.getDecision().isEmpty()
-                    && !posResponse.getDecision().equals("")) {
-                decision = posResponse.getDecision();
-            }
-
-            // Generate receipt
-            if (!createToken) {
-                printReceipt(posResponse);
-            }
-
-            // Decision codes returned from FCC
-            switch (decision) {
-
-                // Request was accepted
-                case "A":
-
-                    //
-                    CommandListener.signatureOk = true;
-                    CommandListener.isComplete = true;
-                    setPaymentDetails();
-
-                    //
-                    return true;
-
-                // Request was missing required fields or contained incorrect credentials - Contact ISV
-                case "E":
-
-                // Request failed due to internal condition (communication / server error) - Retry transaction
-                case "F":
-
-                    //
-                    CommandListener.signatureOk = false;
-                    CommandListener.isComplete = true;
-                    setPaymentDetails();
-
-                    //
-                    return false;
-
-                // Request rejected due to card error (insufficient funds, bad number, etc) - Retry with different card
-                case "R":
-
-                    //
-                    switch (message) {
-                        case "UserCancel":
-                            break;
-                        case "Lane Timeout":
-                            cancelPayment();
-                            break;
-                    }
-
-                    //
-                    CommandListener.signatureOk = false;
-                    CommandListener.isComplete = true;
-                    setPaymentDetails();
-
-                    //
-                    return false;
-
-                // Request failed due to other decision code outside of client scope - Contact FCC
-                default:
-
-                    //
-                    CommandListener.signatureOk = false;
-                    CommandListener.isComplete = true;
-                    setPaymentDetails();
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (freedomPayTransactionResponse.getToken() != null && !freedomPayTransactionResponse.getToken().isEmpty()) {
+            isToken = true;
+            token = freedomPayTransactionResponse.getToken();
+            // TODO: Use payment details to store this
+            TokenStore.storeToken(generateCustomerNumber(), token);
         }
 
-        // Assume response failed if not handled by switch
+        if (freedomPayTransactionResponse.getMerchantReferenceCode() != null && !freedomPayTransactionResponse.getMerchantReferenceCode().isEmpty()) {
+            merchantReferenceCode = freedomPayTransactionResponse.getMerchantReferenceCode();
+        }
+
+        if (freedomPayTransactionResponse.getRequestId() != null && !freedomPayTransactionResponse.getRequestId().isEmpty()) {
+            requestId = freedomPayTransactionResponse.getRequestId();
+        }
+
+        if (freedomPayTransactionResponse.getApprovedAmount() != null && !freedomPayTransactionResponse.getApprovedAmount().isEmpty()) {
+            amountDouble = Double.parseDouble(freedomPayTransactionResponse.getApprovedAmount());
+        }
+
+        if (freedomPayTransactionResponse.getTipAmount() != null && !freedomPayTransactionResponse.getTipAmount().isEmpty()) {
+            tipDouble = Double.parseDouble(freedomPayTransactionResponse.getTipAmount());
+        }
+
+        if (freedomPayTransactionResponse.getDecision() != null && !freedomPayTransactionResponse.getDecision().isEmpty()) {
+            decision = freedomPayTransactionResponse.getDecision();
+            System.out.println("Decision: " + decision);
+            message = freedomPayTransactionResponse.getMessage();
+            System.out.println("Message: " + message);
+        }
+
+        if (!createToken) {
+            printReceipt(freedomPayTransactionResponse);
+        }
+
+        switch (decision) {
+
+            case "A":
+                CommandListener.isApproved = true;
+                CommandListener.isComplete = true;
+                setPaymentDetails();
+
+                // TODO: Alert POS - Approved / Accepted - Complete
+                return true;
+
+            case "E":
+
+                // TODO: Alert POS - Declined / Invalid Card Data - Try Again - Same Card
+
+            case "F":
+
+                // TODO: Alert POS - Declined / Communication Failure - Try Again - Same Card
+
+            case "R":
+
+                // TODO: Alert POS - Declined / Insufficient Funds - Try Again - Different Card
+
+                switch (message) {
+                    case "UserCancel":
+                        break;
+                    case "Lane Timeout": // TODO: Ensure this happens after 30 seconds
+                        cancelPayment();
+                        break;
+                    default:
+                }
+
+            default:
+
+                CommandListener.isApproved = false;
+                CommandListener.isComplete = true;
+                setPaymentDetails();
+        }
+
         return false;
     }
 
-    private void getData() {
+    private void getTransactionResponseData() {
+
         try {
-            System.out.println("Getting data...");
-            responseXML = fpDataStream.openStream(fpConnection.fpConnection, requestBytes);
+            responseXML = freedomPayDataStreamManager.openStream(freedomPayConnectionHelper, requestBytes);
         } catch (IOException e) {
             e.printStackTrace();
+            System.out.println("Connection Error");
+            // TODO: Alert POS - Transaction Response Failure - (2)
         }
-        System.out.println("Got it! \n" + responseXML);
     }
 
-    // Called by getRequest() - Send Request object -> Return String
-    private static String serializeToXmlString(Request request) throws JsonProcessingException {
+    private static String serializeToXmlString(FreedomPayTransactionRequest request) throws JsonProcessingException {
 
-        // Map request object to XML
         XmlMapper xmlMapper = new XmlMapper();
         xmlMapper.setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
+
+        // TODO: Log using API call
         File xmlOutput = new File("request_log.xml");
 
-        //
         try (FileWriter fileWriter = new FileWriter(xmlOutput)) {
             fileWriter.write(xmlMapper.writeValueAsString(request));
         } catch (IOException e) {
             e.printStackTrace();
+            // TODO: Alert POS - Transaction Request Failure - (2)
         }
 
-        //
         return xmlMapper.writeValueAsString(request);
     }
 
-    // Called by getRequest() - Connection expects bytes
     private static byte[] serializeToByteArray(String xmlString) {
-
-        // Package request XML to byte array
         return xmlString.getBytes(StandardCharsets.UTF_8);
     }
 
-    // Called by getRequest() - Send String -> Return Response object
-    private static Response deserializeFromXmlString(String response) throws IOException {
+    private static FreedomPayTransactionResponse deserializeFromXmlString(String response) throws IOException {
 
+        // TODO: Log using API call
         File xmlOutput = new File(invoice + "response_log.xml");
         XmlMapper xmlMapper = new XmlMapper();
 
-        //
         try (FileWriter fileWriter = new FileWriter(xmlOutput)) {
             fileWriter.write(xmlMapper.writeValueAsString(response));
         } catch (IOException e) {
             e.printStackTrace();
+            // TODO: Alert POS - Transaction Request Failure - (2)
         }
 
-        // Unpack response XML to response object
-        return xmlMapper.readValue(response, Response.class);
+        // TODO: EOF error? Need @NoArgsConstructor?
+        return xmlMapper.readValue(response, FreedomPayTransactionResponse.class);
     }
 
-    // Called by getResponse()
-    private boolean printReceipt(Response response) {
+    // TODO: Refactor into separate class
+    private boolean printReceipt(FreedomPayTransactionResponse response) {
 
-        // Check for valid receipt data
-        if (response.getReceiptText() != null
-                && !response.getReceiptText().isEmpty()
-                && !response.getReceiptText().equals("")) {
+        if (response.getReceiptText() != null && !response.getReceiptText().isEmpty()) {
 
             // TODO: Source printer address from config
             Printable printer = new NetworkPrinter("10.10.50.33", 9100);
             PrinterService printerService = new PrinterService(printer);
 
-            // Call print method and close device
-            printerService.print(new Receipt(invoice, items, amountDouble, taxDouble, tipDouble, posResponse).getFullReceipt());
+            printerService.print(new Receipt(invoice, items, amountDouble, taxDouble, tipDouble, freedomPayTransactionResponse).getFullReceipt());
             printerService.cutFull();
             printerService.close();
 
-            //
             return true;
         }
 
-        // No receipt data
         return false;
     }
 
-    // Called by execute() with amount values
     private void setAmountValues(int amount, int tax, int tip) {
 
-        //
         amountDouble = (double) (amount / 100);
         taxDouble = (double) (tax / 100);
         tipDouble = (double) (tip / 100);
 
-        //
-        posRequest.setChargeAmount(String.valueOf(amountDouble));
-        posRequest.setTaxAmount(String.valueOf(taxDouble));
-        posRequest.setTipAmount(String.valueOf(tipDouble));
+        freedomPayTransactionRequest.setChargeAmount(String.valueOf(amountDouble));
+        freedomPayTransactionRequest.setTaxAmount(String.valueOf(taxDouble));
+        freedomPayTransactionRequest.setTipAmount(String.valueOf(tipDouble));
     }
 
-    // Assign customer data to request object
     private void setCustomerData() {
 
-        // TODO: Source from POS
-        posRequest.setBillToFirstName("Sally");
-        posRequest.setBillToLastName("Jones");
-        posRequest.setBillToStreet1("333 W Main St");
-        posRequest.setBillToCity("Phoenix");
-        posRequest.setBillToState("AZ");
-        posRequest.setBillToPostalCode("12345");
-        posRequest.setCustomerPODate(dateAsISO);
-        posRequest.setCustomerCode(generateCustomerNumber());
-        posRequest.setItems(items);
+        // TODO: Source from response data
+        freedomPayTransactionRequest.setBillToFirstName("Sally");
+        freedomPayTransactionRequest.setBillToLastName("Jones");
+        freedomPayTransactionRequest.setBillToStreet1("333 W Main St");
+        freedomPayTransactionRequest.setBillToCity("Phoenix");
+        freedomPayTransactionRequest.setBillToState("AZ");
+        freedomPayTransactionRequest.setBillToPostalCode("12345");
+        freedomPayTransactionRequest.setCustomerPoDate(dateAsISO);
+        freedomPayTransactionRequest.setCustomerCode(generateCustomerNumber());
+        freedomPayTransactionRequest.setItems(items);
     }
 
-    // Generates a unique customer code from hash value of fields below used for key for token storage
     private String generateCustomerNumber() {
 
-        //
-        return String.valueOf((posRequest.getBillToFirstName() + posRequest.getBillToStreet1() + posRequest.getBillToCity())
-                .hashCode())
-                .replace("-", "");
+        return String.valueOf(
+                (freedomPayTransactionRequest.getBillToFirstName()
+                        + freedomPayTransactionRequest.getBillToStreet1()
+                        + freedomPayTransactionRequest.getBillToCity())
+                        .hashCode()).replace("-", "");
     }
 
-    // Assign payment details and observe data
     private void setPaymentDetails() {
 
-        //
-        paymentDetails = new PaymentDetails();
+        PaymentDetails paymentDetails = new PaymentDetails();
 
-        //
         paymentDetails.setInvoice(invoice);
         paymentDetails.setCustomerCode(generateCustomerNumber());
         paymentDetails.setDecision(decision);
-        paymentDetails.setMessage(posResponse.getMessage());
-        paymentDetails.setMerchantReferenceCode(posResponse.getMerchantReferenceCode());
-        paymentDetails.setRequestId(posResponse.getRequestId());
+        paymentDetails.setMessage(freedomPayTransactionResponse.getMessage());
+        paymentDetails.setMerchantReferenceCode(freedomPayTransactionResponse.getMerchantReferenceCode());
+        paymentDetails.setRequestId(freedomPayTransactionResponse.getRequestId());
         paymentDetails.setToken(token);
 
-        //
+        // TODO: Store this with API call
         PaymentUtil.observeData(paymentDetails);
     }
 }

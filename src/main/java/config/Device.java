@@ -9,21 +9,22 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 import java.io.*;
-import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Device {
 
-    private static boolean isRegisterDevice;
-    private static NetRegisterDevice netRegisterDevice;
-    private static String locationId, deviceType, deviceId, application, applicationVersion, token;
+    public static NetRegisterDevice netRegisterDevice;
+    private static String locationId, deviceId, deviceType, application, applicationVersion;
 
     /**
      * Editable device configurations located in device_config.json file, to be stored locally.
      *
-      * @return true if file read succeeds.
+     * @return true if file read succeeds.
      */
     private static boolean configureDeviceFromJson() {
 
+        System.out.println("<3.2><>configureDevice");
         StringBuilder data = new StringBuilder("");
 
         // TODO: Supply correct path
@@ -32,7 +33,7 @@ public class Device {
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
 
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                System.out.println(line);
+                System.out.println(">>>" + line + "<<<");
                 data.append(line);
             }
 
@@ -41,112 +42,68 @@ public class Device {
         }
 
         JSONObject jsonObject = new JSONObject(data.toString());
+        System.out.println("Device.configureDevice() : " + jsonObject);
 
-        if (jsonObject != null) {
+        locationId = jsonObject.optString("location_id", null);
+        deviceId = jsonObject.optString("device_id", null);
+        deviceType = jsonObject.optString("device_type", null);
+        application = jsonObject.optString("application", null);
+        applicationVersion = jsonObject.optString("app_version", null);
 
-            locationId = jsonObject.optString("location_id", null);
-            deviceType = jsonObject.optString("device_type", null);
-            deviceId = jsonObject.optString("device_id", null);
-            application = jsonObject.optString("application", null);
-            applicationVersion = jsonObject.optString("app_version", null);
-
-            System.out.println(jsonObject);
+        assert locationId != null;
+        assert deviceId != null;
+        assert deviceType != null;
+        assert application != null;
+        assert applicationVersion != null;
 
         return true;
-
-        }
-
-        // TODO: Send to server
-
-        /**
-         * API Call to register device
-         *
-         * dp_verfiy_location
-         *
-         */
-
-
-
-
-//        if (jsonObject.optString("ResponseMessage", "").equalsIgnoreCase("Log In Successful.")) {
-//            netRegisterDevice = new NetRegisterDevice()
-//                    .setLocationId(locationId)
-//                    .setDevice(deviceType)
-//                    .setSerialNumber(deviceId)
-//                    .setApplication(application)
-//                    .setVersion(Integer.parseInt(applicationVersion));
-//            return true;
-//        }
-
-
-        return false;
     }
 
+    public static void registerDevice(String token) {
 
-        public static NetRegisterDevice registerDevice(String token) {
-            System.out.println("WE ARE REGISTERING DEVICE, OR TRYING TO");
+        System.out.println("<3.1><>registerDevice with token[" + token + "]");
 
-            if (!configureDeviceFromJson()) {
-                System.out.println("Is configureFromDevice null?");
-                return null;
-            }
+        if (token != null) {
 
-            System.out.println("DEVICE.java");
-            System.out.println(locationId);
-            System.out.println(token);
-            System.out.println(deviceType);
-            System.out.println(deviceId);
-            System.out.println(application);
-            System.out.println(applicationVersion);
+            if (configureDeviceFromJson()) {
 
-            // TODO: Investigate reducing this API payload
-            Call<String> registerDeviceCall = RegisterDeviceApiController.getRegisterDeviceApiCall(locationId, token, deviceType, deviceId, application, applicationVersion);
+                System.out.println("<3.3><>configureDeviceFromJson: true");
 
-            registerDeviceCall.enqueue(new Callback<>() {
+                Call<String> registerDeviceCall = RegisterDeviceApiController.getRegisterDeviceApiCall(token, locationId, deviceId, deviceType, application, applicationVersion);
 
-                @SneakyThrows
-                @Override
-                public void onResponse(@NotNull Call<String> call, @NotNull Response<String> response) {
+                registerDeviceCall.enqueue(new Callback<>() {
 
-                    assert response.body() != null;
+                    @SneakyThrows
+                    @Override
+                    public void onResponse(@NotNull Call<String> call, @NotNull Response<String> response) {
 
-                    JSONObject jsonObject = new JSONObject(response.body());
-                    System.out.println("DEVICE.JsonObject" + jsonObject);
+                        System.out.println("<3.4><>registerDeviceCall.onResponse");
+                        assert response.body() != null;
 
-                    // TODO: THis is right
-                    if (jsonObject.optString("ResponseMessage", "").equalsIgnoreCase("Log In Successful.")) {
-                        System.out.println("LOGIN SUCCEED");
+                        JSONObject jsonObject = new JSONObject(response.body());
 
-                        netRegisterDevice = new NetRegisterDevice()
-                                .setLocationId(locationId)
-                                .setDevice(deviceType)
-                                .setSerialNumber(deviceId)
-                                .setApplication(application)
-                                .setVersion(Integer.parseInt(applicationVersion));
+                        if (jsonObject.optString("ResponseCode", "").equalsIgnoreCase("1")) {
 
-                        System.out.println(netRegisterDevice + "<<<<<<<<<<<<<<<");
-                        System.out.println();
+                            netRegisterDevice = new NetRegisterDevice()
+                                    .setLocationId(locationId)
+                                    .setSerialNumber(deviceId)
+                                    .setDevice(deviceType)
+                                    .setApplication(application)
+                                    .setVersionName(applicationVersion)
+                                    .setVersion(Integer.parseInt(applicationVersion))
+                                    .setServerVersion(1l); // TODO: Source value
+                        }
 
-                        isRegisterDevice = response.isSuccessful();
-
-
+                        System.out.println("<3.6><>returning netRegisterDevice as [" + netRegisterDevice + "]");
+                        System.out.println("Register Device finished?");
                     }
-                }
 
-                @Override
-                public void onFailure(@NotNull Call<String> call, @NotNull Throwable t) {
-                    isRegisterDevice = false;
-                }
-            });
-
-            // TODO: Wait until not null
-            System.out.print("W");
-            while (netRegisterDevice == null) {
-                System.out.print("");
-
+                    @Override
+                    public void onFailure(@NotNull Call<String> call, @NotNull Throwable t) {
+                        System.out.println("<3.5><>registerDeviceCall.onFailure");
+                    }
+                });
             }
-
-            System.out.println("DEVICE.REGISTER" + netRegisterDevice);
-            return netRegisterDevice;
         }
     }
+}

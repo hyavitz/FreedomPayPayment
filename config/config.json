@@ -8,7 +8,7 @@
   "device" : "PAX",
   "serial_number" : "53096522",
   "application" : "QuickPointDesktop",
-  "version" : "001",
+  "app_version" : "001",
   "version_name" : "0.0.1",
   "server_version" : "1"
 }

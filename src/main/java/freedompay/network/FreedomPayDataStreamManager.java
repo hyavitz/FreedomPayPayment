@@ -6,39 +6,37 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 
+/**
+ * This utility class provides a connection stream
+ * using an HttpConnection supplied by FreedomPayConnectionHelper,
+ * called by FreedomPayPaymentDevice.
+ *
+ * @author Hunter Yavitz - 8/10/21 - Revision
+ */
+
 public class FreedomPayDataStreamManager {
 
-    /**
+    private static FreedomPayDataStreamManager freedomPayDataStreamManager;
 
-        This class opens a data stream using an HTTP URL connection
-        which sends a byte array and accepts a string response.  It
-        manages its own connection internally.
+    public static FreedomPayDataStreamManager getFreedomPayDataStreamManagerInstance() {
+        if (freedomPayDataStreamManager == null) {
+            freedomPayDataStreamManager = new FreedomPayDataStreamManager();
+        }
+        return freedomPayDataStreamManager;
+    }
 
-        This is called by the FPPaymentDevice class.
-
-        @author Hunter Yavitz - 3/10/21
-
-     */
-
-    // Declare string builder for response
-    private final StringBuilder responseStringBuilder = new StringBuilder();
-
-    // Return FPDataStream instance
-    public static FreedomPayDataStreamManager getFPDataStreamInstance() { return new FreedomPayDataStreamManager(); }
-
-    // Private constructor
     private FreedomPayDataStreamManager() {}
 
-    // Open data stream
+    int i = 0;
     public String openStream(HttpURLConnection connection, byte[] dataByteArray) throws IOException {
+        StringBuilder responseStringBuilder = new StringBuilder();
+        System.out.println("openStream: " + ++i);
 
-        // Send byte array as request
-        try {
+        try  {
             DataOutputStream writer = new DataOutputStream(connection.getOutputStream());
             writer.write(dataByteArray);
             writer.flush();
 
-            // Accept string as response
             try {
                 BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                 String line;
@@ -46,20 +44,14 @@ public class FreedomPayDataStreamManager {
                     responseStringBuilder.append(line);
                     responseStringBuilder.append(System.lineSeparator());
                 }
-
             } catch (IOException e) {
-
-                // Maybe there's no connection
                 e.printStackTrace();
+                // TODO: Alert POS - Connection Failure - (3)
             }
 
-        } finally {
-
-            // Always close connection
-            connection.disconnect();
-        }
-
-        // Return string as response
+            } finally {
+                connection.disconnect();
+            }
         return responseStringBuilder.toString();
     }
 }

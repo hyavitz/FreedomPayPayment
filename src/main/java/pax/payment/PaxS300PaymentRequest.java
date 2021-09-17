@@ -1,10 +1,7 @@
 package pax.payment;
 
-import com.pax.poslink.AddlRspData;
-import com.pax.poslink.ManageRequest;
 import com.pax.poslink.PaymentRequest;
 import interceptor.CommandListener;
-import payment.InvoiceNumber;
 
 /**
  * This class returns a PaymentRequest object used by PosLink.
@@ -46,10 +43,10 @@ public class PaxS300PaymentRequest {
     private String origRefNum;
     private String merchantKey;
     private String invNum;
-    private String ecrRefNum; // TODO: Generate from POS assign to webhook transactionNo for follow-on transactions (PaymentRequest -> PaymentResponse)
+    private String ecrRefNum;
     private String authCode;
     private String ecrTransId;
-    private String origEcrRefNum; // TODO: Source from ECRRefNum of prior transactions (PaymentResponse -> PaymentRequest)
+    private String origEcrRefNum;
     private String commercialCard;
     private String continuousScreen;
     private String serviceFee;
@@ -61,8 +58,6 @@ public class PaxS300PaymentRequest {
     private String fleetCard;
     private String multiMerchant;
     private String lodgingInfo;
-
-    /** REQUEST EXTRA DATA */
 
     // account information
     private String account;
@@ -188,7 +183,11 @@ public class PaxS300PaymentRequest {
     private static final PaymentRequest.TransactionBehavior transactionBehaviour = new PaymentRequest.TransactionBehavior();
 
     // Sale - Card Present and Required Amount (Tax and Tip Nullable)
-    public static PaymentRequest getPaymentRequestSale(int amount, int tip, int tax) {
+    public static PaymentRequest getPaymentRequestSale(int amount, String href) {
+
+        System.out.println("PAXS300PaymentRequest.getPaymentRequestSale");
+        System.out.println("amount: " + amount);
+        System.out.println("href: " + href);
 
         // Configure tender and transaction
         paymentRequest.TenderType = paymentRequest.ParseTenderType("CREDIT");
@@ -199,23 +198,36 @@ public class PaxS300PaymentRequest {
         paymentRequest.TransactionBehavior = transactionBehaviour;
 
         // Required currency field
-        paymentRequest.Amount = Math.round(amount) + "";
-        paymentRequest.TipAmt = Math.round(tip) + "";
-        paymentRequest.TaxAmt = Math.round(tax) + "";
+        paymentRequest.Amount = amount + "";
+        System.out.println("Setting paymentRequest.Amount to:" + paymentRequest.Amount);
 
-        // Assign transaction reference (ECRN + Invoice)
-        //paymentRequest.ECRRefNum = InvoiceNumber.generateInvoiceNumber(); // TODO: Generate value for follow-on transactions
-        System.out.println("paymentRequest.ECRRefNum is being set to: " + CommandListener.href);
-        paymentRequest.ECRRefNum = CommandListener.href;
-        paymentRequest.InvNum = paymentRequest.ECRRefNum;
+        paymentRequest.OrigECRRefNum = href;
+        System.out.println("href: " + href);
+        paymentRequest.OrigRefNum = href; // TODO: it's one of these, not both...
+        paymentRequest.ECRRefNum = CommandListener.paymentDetails.getInvoice().substring(4);
+        System.out.println("CommandListener.paymentDetails.getInvoice().substring(4): " + paymentRequest.ECRRefNum);
+        paymentRequest.InvNum = CommandListener.paymentDetails.getInvoice();
+        System.out.println("CommandListener.paymentDetails.getInvoice():" + paymentRequest.InvNum);
+        paymentRequest.ECRTransID = CommandListener.paymentDetails.getTransactionNumber();
+        System.out.println("CommandListener.paymentDetails.getTransactionNumber()" + paymentRequest.ECRTransID);
 
-        CommandListener.isVoid = false;
+        System.out.println("Setting references>>");
+        System.out.println("OrigECRRefNum: " + paymentRequest.OrigECRRefNum);
+        System.out.println("OrigRefNum: " + paymentRequest.OrigRefNum);
+        System.out.println("ECRRefNum: " + paymentRequest.ECRRefNum);
+        System.out.println("InvNum: " + paymentRequest.InvNum);
 
+
+        System.out.println("About to return paymentRequest: " + paymentRequest);
         return paymentRequest;
     }
 
     // Return - Card Present and Optional Amount (Partial Allowed)
-    public static PaymentRequest getPaymentRequestReturn(int amount) {
+    public static PaymentRequest getPaymentRequestReturn(int amount, String href) {
+
+        System.out.println("PAXS300PaymentRequest.getPaymentRequestReturn");
+        System.out.println("amount: " + amount);
+        System.out.println("href: " + href);
 
         // Configure tender and transaction
         paymentRequest.TenderType = paymentRequest.ParseTenderType("CREDIT");
@@ -224,57 +236,61 @@ public class PaxS300PaymentRequest {
         // Required currency field
         paymentRequest.Amount = amount + "";
 
-        // Assign transaction reference (ECRN)
-        paymentRequest.ECRRefNum = InvoiceNumber.generateInvoiceNumber(); // TODO: Generate value for follow-on transactions
+        paymentRequest.OrigECRRefNum = href;
+        paymentRequest.OrigRefNum = href; // TODO: it's one of these, not both...
+        paymentRequest.ECRRefNum = CommandListener.paymentDetails.getInvoice().substring(4);
 
         return paymentRequest;
     }
 
     // Void - Original Reference Number (or Transaction Number on Request)
-    public static PaymentRequest getPaymentRequestVoid(String referenceNumber) {
+    public static PaymentRequest getPaymentRequestVoid(String href) {
+
+        System.out.println("PAXS300PaymentRequest.getPaymentRequestVoid");
+        System.out.println("amount: ");
+        System.out.println("href: " + href);
 
         // Configure tender and transaction
         paymentRequest.TenderType = paymentRequest.ParseTenderType("CREDIT");
         paymentRequest.TransType = paymentRequest.ParseTransType("VOID");
 
         // Assign transaction reference (ECRN + Original ECRN)
-        paymentRequest.ECRRefNum = CommandListener.href;
-        // paymentRequest.OrigRefNum = referenceNumber; // TODO: Source value for follow-on transactions
-        // ManageRequest manageRequest = new ManageRequest(); // TODO: PaymentResponse.ExtraData.HRef -> PaymentRequest.ExtraData.HRefNum
-        paymentRequest.OrigECRRefNum = CommandListener.href;
+        paymentRequest.OrigECRRefNum = href;
+        System.out.println("Set paymentRequest.OrigECRRefNum: " + paymentRequest.OrigECRRefNum);
+        paymentRequest.OrigRefNum = href; // TODO: it's one of these, not both...
+        System.out.println("Set paymentRequest.OrigRefNum: " + paymentRequest.OrigRefNum);
+        paymentRequest.ECRRefNum = CommandListener.paymentDetails.getInvoice().substring(4);
+        System.out.println("Set paymentRequest.ECRRefNum: " + paymentRequest.ECRRefNum);
 
+        System.out.println("Setting references>>");
+        System.out.println("OrigECRRefNum: " + paymentRequest.OrigECRRefNum);
+        System.out.println("OrigRefNum: " + paymentRequest.OrigRefNum);
+        System.out.println("ECRRefNum: " + paymentRequest.ECRRefNum);
+        System.out.println("InvNum: " + paymentRequest.InvNum);
 
         //
-        System.out.println("CommandListener.href is: " + CommandListener.href); // TODO: Why is this empty?
-        System.out.println("PaymentRequest is assigning OrigRefNum to " + paymentRequest.OrigRefNum); // TODO: Why is this empty?
         paymentRequest.Amount = "0";
-        paymentRequest.TipAmt = "";
-        paymentRequest.TaxAmt = "";
-
+        System.out.println("Set paymentRequest.Amount: " + paymentRequest.Amount);
         CommandListener.isVoid = true;
+        System.out.println("Set CommandListener.isVoid: " + CommandListener.isVoid);
 
         return paymentRequest;
     }
 
     // Adjust - Original Reference Number with Total Adjusted Amount or Tip
-    public static PaymentRequest getPaymentRequestAdjust(String referenceNumber, int amount, int tip) {
+    public static PaymentRequest getPaymentRequestAdjust(int amount, String href) {
 
         // Configure tender and transaction
         paymentRequest.TenderType = paymentRequest.ParseTenderType("CREDIT");
         paymentRequest.TransType = paymentRequest.ParseTransType("ADJUST");
 
-        // Optional currency fields - Adjust by tip or pass -1 to adjust by total amount
-        if (tip > 0) {
-            paymentRequest.TipAmt = Math.round(tip) + "";
-        } else if (amount > 0){
-            paymentRequest.Amount = Math.round(amount) + "";
-        } else {
-            // TODO: Throw Exception - Process as Failure
-        }
+        // Round to nearest cent
+        paymentRequest.Amount = Math.round(amount) + "";
 
         // Assign transaction reference
-        paymentRequest.ECRRefNum = InvoiceNumber.generateInvoiceNumber(); // TODO: Generate value for follow-on transactions
-        paymentRequest.OrigRefNum = referenceNumber; // TODO: Source value for follow-on transactions
+        paymentRequest.OrigECRRefNum = href;
+        paymentRequest.OrigRefNum = href;
+        paymentRequest.ECRRefNum = CommandListener.paymentDetails.getInvoice();
 
         return paymentRequest;
     }

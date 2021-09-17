@@ -4,9 +4,6 @@ import interceptor.AlertDialogStyle;
 import interceptor.CommandListener;
 import payment.PaymentDetails;
 import payment.PaymentUtil;
-import printer.NetworkPrinter;
-import printer.Printable;
-import printer.PrinterService;
 import payment.IPaymentDevice;
 
 import java.io.*;
@@ -298,14 +295,14 @@ public class WorldPayPaymentDevice implements IPaymentDevice {
                         details.setDecision("Accepted");
                         details.setMessage("Approved");
                         CommandListener.isComplete = true;
-                        CommandListener.signatureOk = true;
+                        CommandListener.isApproved = true;
                     } else {
                         decline();
                         System.out.println("user declined signature");
                         details.setDecision("Rejected");
                         details.setMessage("Declined");
                         CommandListener.isComplete = true;
-                        CommandListener.signatureOk = false;
+                        CommandListener.isApproved = false;
                     }
                     PaymentUtil.observeData(details);
                 }
@@ -343,7 +340,7 @@ public class WorldPayPaymentDevice implements IPaymentDevice {
                 details.setDecision("Accepted");
                 details.setMessage("Approved");
                 CommandListener.isComplete = true;
-                CommandListener.signatureOk = true;
+                CommandListener.isApproved = true;
                 PaymentUtil.observeData(details);
                 //the transaction is finished get the receipts
                 System.out.println("GETTING RECEIPTS AFTER THIS FROM FINALISING");
@@ -363,7 +360,7 @@ public class WorldPayPaymentDevice implements IPaymentDevice {
                 details.setDecision("Rejected");
                 details.setMessage("Declined");
                 CommandListener.isComplete = true;
-                CommandListener.signatureOk = false;
+                CommandListener.isApproved = false;
                 PaymentUtil.observeData(details);
                 //the transaction is finished get the receipts
                 System.out.println("GETTING RECEIPTS AFTER THIS");
