@@ -87,16 +87,17 @@ public class PAXS300PaymentDevice implements IPaymentDevice {
             posLink.SetCommSetting(PaxS300CommConfig.getCommSetting());
 
             // Setup request params
+            System.out.println("Should set makeSale transaction number to: " + CommandListener.href);
             posLink.PaymentRequest = PaxS300PaymentRequest.getPaymentRequestSale(totalAmt, CommandListener.href);
 
             System.out.println("DEVICE TRANSACTION START?");
-            TransactionLog.generateLog("Start Transaction", "Payment Terminal");
+            //TransactionLog.generateLog("Start Transaction", "Payment Terminal");
 
             // Process payment and capture response
             processTransResult = new ProcessTransResult();
             processTransResult = posLink.ProcessTrans();
 
-            Thread.sleep(1000);
+            //Thread.sleep(1000);
             processPaymentResults();
         }
     }

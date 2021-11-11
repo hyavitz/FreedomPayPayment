@@ -1,19 +1,25 @@
 import config.Device;
+import interceptor.Client;
+import interceptor.CommandListener;
+import interceptor.InterceptorClient;
 import interceptor.NetRegisterDevice;
+import io.FileWatcher;
 import network.Heartbeat;
 import network.Token;
+import pax.PAXS300PaymentDevice;
 import payment.IPaymentDevice;
 import payment.PaymentGUI;
 
+import java.io.FileWriter;
 import java.io.IOException;
 
 import static freedompay.FreedomPayPaymentDevice.getFreedomPayPaymentDeviceInstance;
 
 public class Test {
 
-    public static NetRegisterDevice netRegisterDevice;
+    public static NetRegisterDevice netRegisterDevice = new NetRegisterDevice();
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException, InterruptedException {
 
         Heartbeat.checkHeartbeat();
         try {
@@ -33,6 +39,7 @@ public class Test {
         }
         System.out.println("<2><>TOKEN: " + Token.token);
 
+
         Device.registerDevice(Token.token);
         try {
             Thread.sleep(2000);
@@ -45,12 +52,15 @@ public class Test {
 
         assert Heartbeat.hasNetworkConnection && Token.token != null && netRegisterDevice != null;
 
-        PaymentGUI.getPaymentGUIInstance();
+//        PaymentGUI.getPaymentGUIInstance();
 
+//        FileWatcher fileWatcher = new FileWatcher();
+//        fileWatcher.setWatchService();
 
-//        Client.CommandListener listener = new CommandListener(paymentDevice);
-//        InterceptorClient ic = InterceptorClient.getInstance().addCommandHandler(listener);
-//        InterceptorClient.register = netRegisterDevice;
-//        ic.start();
+        IPaymentDevice paymentDevice = new PAXS300PaymentDevice();
+        Client.CommandListener listener = new CommandListener(paymentDevice);
+        InterceptorClient ic = InterceptorClient.getInstance().addCommandHandler(listener);
+        InterceptorClient.netRegisterDevice = netRegisterDevice;
+        ic.start();
     }
 }

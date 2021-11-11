@@ -1,12 +1,12 @@
 {
-  "location_id" : "273388",
-  "device_id" : "2510855011",
-  "device_type" : "Exadigm",
+  "location_id" : "10009",
+  "device_id" : "53096522",
+  "device_type" : "PAX",
   "application" : "QuickPoint",
   "app_version" : "001",
-  "store_id" : "1496617013",
+  "store_id" : "123",
   "lane_id" : "0",
-  "client_environment" : "SoftPoint",
+  "client_environment" : "Focus",
   "invoice" : "10000",
   "version_name" : "0.0.1",
   "server_version" : "1"

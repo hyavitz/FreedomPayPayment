@@ -28,7 +28,7 @@ public class Device {
         StringBuilder data = new StringBuilder("");
 
         // TODO: Supply correct path
-        File file = new File("C:\\Users\\Hunter\\IdeaProjects\\FreedomPayPayment\\src\\main\\java\\config\\device_config.json");
+        File file = new File("C:\\Users\\Hunter\\Documents\\GitHub\\FreedomPayPayment\\src\\main\\java\\config\\device_config.json");
 
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
 

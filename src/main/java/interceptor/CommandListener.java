@@ -69,7 +69,7 @@ public class CommandListener implements Client.CommandListener {
 
     @Override
     public void handle(NetCommand command) {
-
+        System.out.println("CommandListener is handling command: " + command);
         switch (command.getCommand().toString()) {
 
             case "SALE":
@@ -88,7 +88,8 @@ public class CommandListener implements Client.CommandListener {
                     responseMessage = new Gson().fromJson(command.getResponseMessage(), ResponseMessage.class);
 
                     System.out.println("Got response: " + responseMessage);
-                    href = responseMessage.getUnique_ticket_id().substring(4);
+                    href = responseMessage.getUnique_ticket_id().substring(6);
+                    System.out.println("Setting href for transaction: " + href);
 
                     amount = (Double.parseDouble(responseMessage.getAmount()) / 100);
                     amt = Integer.parseInt(responseMessage.getAmount());
@@ -96,6 +97,7 @@ public class CommandListener implements Client.CommandListener {
                     System.out.println("Amt (I) : " + amt);
 
                     paymentDetails.setTransactionNumber(InvoiceNumber.generateInvoiceNumber().substring(4));
+                    System.out.println("Setting transaction number to: " + paymentDetails.getTransactionNumber());
                     paymentDetails.setAmount(String.valueOf(amt));
                     System.out.println("after paymentDetails.setAmount:" + paymentDetails.getAmount());
                     if (paymentDetails.getOriginalAmount() == null) {paymentDetails.setOriginalAmount(responseMessage.getAmount());}
@@ -115,14 +117,36 @@ public class CommandListener implements Client.CommandListener {
                     }
 
                     if (isApproved) {
-                        paymentDetails.setDecision(PaymentStatus.APPROVED.getValue()); // TODO: This is also being assigned in PAXS300PaymentDevice class
+                        paymentDetails.setDecision(PaymentStatus.APPROVED.getValue()); // TODO: This is also being assigned in PAXS300PaymentDevice class - Rookie move
                         System.out.println("Comparing totals...");
                         System.out.println("Due:" + paymentDetails.getAmount());
                         System.out.println("Paid:" + paymentDetails.getApprovedAmount());
-                        if (Integer.parseInt(paymentDetails.getAmount()) > Integer.parseInt(paymentDetails.getApprovedAmount())) {
-                            paymentDetails.setStatus(Status.PARTIAL.getValue()); // TODO: It's not paid 'till it's paid...
+
+                        Double dueAmount = Double.parseDouble(paymentDetails.getAmount());
+                        Double chargedAmount = Double.parseDouble(paymentDetails.getApprovedAmount());
+                        Double paymentDiscrepancy = dueAmount - chargedAmount;
+
+                        int discrepancy = 0;
+                        if (paymentDiscrepancy > 0) {
+                            discrepancy = 1;
+                        } else if (paymentDiscrepancy < 0) {
+                            discrepancy = -1;
+                            // tip
                         }
-                        paymentDetails.setStatus(Status.PAID.getValue()); // TODO: It's not paid 'till it's paid...
+
+                        switch (discrepancy) {
+                            case 1:
+                                System.out.println("Discrepancy: PARTIAL");
+                                paymentDetails.setStatus(Status.PARTIAL.getValue()); // TODO: It's not paid 'till it's paid...
+                                break;
+                            case -1:
+                                System.out.println("Discrepancy: TIP");
+                                paymentDetails.setTip(String.valueOf(paymentDiscrepancy));
+                            case 0:
+                                System.out.println("Discrepancy: RESOLVED");
+                                paymentDetails.setStatus(Status.PAID.getValue()); // TODO: It's not paid 'till it's paid...
+                        }
+
 
                         if (isVoid) {
                             applyPaymentRemove();
@@ -147,13 +171,16 @@ public class CommandListener implements Client.CommandListener {
                 break;
 
             case "CANCEL":
+                System.out.println("CommandListener is handling cancel command.");
                 try {
                     paymentDevice.cancelPayment();
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                 }
             case "READY":
+                System.out.println("READY handled");
             default:
+                System.out.println("CommandListener is handling DEFAULT");
         }
     }
 
@@ -170,10 +197,18 @@ public class CommandListener implements Client.CommandListener {
 
         //Payment.insertPaymentCapture(responseMessage.getLocation_id(), responseMessage.getUnique_ticket_id(), transactionStatus, paymentDetails);
 
-        System.out.println("sure would like to set CL amount, it is:" + paymentDetails.getAmount());
+        double approvedAmount = Double.parseDouble(paymentDetails.getApprovedAmount());
+        double dueAmount = Double.parseDouble(paymentDetails.getAmount());
+
+        System.out.println("sure would like to send this amount of $" + dueAmount + " to the server...");
+        if (approvedAmount > dueAmount) {
+            System.out.println("but it looks like there's about $" + (approvedAmount - dueAmount) + " left over, must be a tip.");
+        }
+        System.out.println("so let's send the total amount of $" + approvedAmount + " to the server.");
+
         Token.generateToken();
         Payment.insertPaymentCapture(
-                Token.token, responseMessage.getLocation_id(), InterceptorClient.register.getSerialNumber(),
+                Token.token, responseMessage.getLocation_id(), InterceptorClient.netRegisterDevice.getSerialNumber(),
                 responseMessage.getOv_ticket_id(), String.valueOf(responseMessage.getUnique_webhook_id()), responseMessage.getOv_payment_id(),
                 responseMessage.getUnique_ticket_id(), paymentDetails);
     }
