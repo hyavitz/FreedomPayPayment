@@ -199,68 +199,68 @@ public class Payment {
 
         System.out.println("Would sure like to set the amount in this call, it is:" + paymentDetails.getAmount());
 
-            Call<String> insertPaymentCaptureCall = ApplyPaymentApiController.getApplyPaymentCaptureApiCall(
-                    token, locationId, deviceId, paymentDetails.getTransactionNumber(), ovTicketId, uniqueWebhookId,
-                    ovPaymentId, uniqueTicketId, paymentDetails.getAmount(), paymentDetails.getStatus(), paymentDetails.getDecision(),
-                    paymentDetails.getResultCode(), paymentDetails.getResultMessage(), paymentDetails.getAuthCode(),
-                    paymentDetails.getMaskedCardNumber(), paymentDetails.getCardType(), paymentDetails.getHostReferenceNumber(),
-                    paymentDetails.getReferenceNumber(), paymentDetails.getRawData());
+        Call<String> insertPaymentCaptureCall = ApplyPaymentApiController.getApplyPaymentCaptureApiCall(
+                token, locationId, deviceId, paymentDetails.getTransactionNumber(), ovTicketId, uniqueWebhookId,
+                ovPaymentId, uniqueTicketId, paymentDetails.getApprovedAmount(), paymentDetails.getStatus(), paymentDetails.getDecision(),
+                paymentDetails.getResultCode(), paymentDetails.getResultMessage(), paymentDetails.getAuthCode(),
+                paymentDetails.getMaskedCardNumber(), paymentDetails.getCardType(), paymentDetails.getHostReferenceNumber(),
+                paymentDetails.getReferenceNumber(), paymentDetails.getRawData());
 
-            insertPaymentCaptureCall.enqueue(new Callback<>() {
-                @Override
-                public void onResponse(@NotNull Call<String> call, @NotNull Response<String> response) {
-                    System.out.println("IC FINISH TRANSACTION");
+        insertPaymentCaptureCall.enqueue(new Callback<>() {
+            @Override
+            public void onResponse(@NotNull Call<String> call, @NotNull Response<String> response) {
+                System.out.println("IC FINISH TRANSACTION");
 
-                    assert response.body() != null;
-                    JSONObject responseJSONObject = new JSONObject(response.body());
+                assert response.body() != null;
+                JSONObject responseJSONObject = new JSONObject(response.body());
 
-                    if (responseJSONObject.optString("ResponseCode").equalsIgnoreCase("1")) {
-                        new Thread(() -> {
-                            try {
-                                TransactionLog.generateLog("InsertPayment", "Test");
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-
-                            // TODO: GenerateLog 'validate payment'
-                        }).start();
-
-                        // TODO: onSuccess
-                    } else {
-                        // TODO: paymentFailed
-                    }
-
+                if (responseJSONObject.optString("ResponseCode").equalsIgnoreCase("1")) {
                     new Thread(() -> {
-                        // TODO: GenerateLog 'validate payment'
-                    }).start();
-                    // TODO: !onSuccess
-                }
+                        try {
+                            TransactionLog.generateLog("InsertPayment", "Test");
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
 
-                @Override
-                public void onFailure(@NotNull Call<String> call, @NotNull Throwable t) {
-                    System.out.println("onFail-CommandListener.isComplete: " + CommandListener.isComplete);
-                    CommandListener.isComplete = true;
-                    System.out.println("CommandListener.isComplete: " + CommandListener.isComplete);
-
-                    new Thread(() -> {
                         // TODO: GenerateLog 'validate payment'
                     }).start();
 
-                    // TODO: onFail
-
-                    try {
-                        Thread.sleep(1500);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                    // TODO: onSuccess
+                } else {
+                    // TODO: paymentFailed
                 }
-            });
-        }
+
+                new Thread(() -> {
+                    // TODO: GenerateLog 'validate payment'
+                }).start();
+                // TODO: !onSuccess
+            }
+
+            @Override
+            public void onFailure(@NotNull Call<String> call, @NotNull Throwable t) {
+                System.out.println("onFail-CommandListener.isComplete: " + CommandListener.isComplete);
+                CommandListener.isComplete = true;
+                System.out.println("CommandListener.isComplete: " + CommandListener.isComplete);
+
+                new Thread(() -> {
+                    // TODO: GenerateLog 'validate payment'
+                }).start();
+
+                // TODO: onFail
+
+                try {
+                    Thread.sleep(1500);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
 
     public static void insertPaymentRemove(String token, String locationId, String id_pay) {
 

@@ -1,7 +1,8 @@
 freedompay/pojo/Item.java
  freedompay.pojo.Item
-printer/Commands.java
- printer.Commands
+config/Device.java
+ config.Device
+ config.Device$1
 pax/payment/PaxS300Receipt.java
  pax.payment.PaxS300Receipt
 network/Heartbeat.java
@@ -61,9 +62,8 @@ interceptor/NetRegisterDevice.java
  interceptor.NetRegisterDevice
 pax/payment/PaxS300PaymentResponse.java
  pax.payment.PaxS300PaymentResponse
-interceptor/InterceptorClient.java
- interceptor.InterceptorClient
- interceptor.InterceptorClient$1
+freedompay/network/FreedomPayConnectionHelper.java
+ freedompay.network.FreedomPayConnectionHelper
 interceptor/WebhookSaleInformation.java
  interceptor.WebhookSaleInformation
 freedompay/pojo/FreedomPayTransactionResponse.java
@@ -74,9 +74,9 @@ interceptor/ResponseMessage.java
  interceptor.ResponseMessage
 pax/network/PaxS300CommConfig.java
  pax.network.PaxS300CommConfig
-config/Device.java
- config.Device
- config.Device$1
+interceptor/InterceptorClient.java
+ interceptor.InterceptorClient
+ interceptor.InterceptorClient$1
 payment/IPaymentDevice.java
  payment.IPaymentDevice
 freedompay/filestore/TransactionDao.java
@@ -129,12 +129,12 @@ network/CheckHeartbeatApiController.java
  network.CheckHeartbeatApiController
 interceptor/HeartbeatResponse.java
  interceptor.HeartbeatResponse
-freedompay/network/FreedomPayConnectionHelper.java
- freedompay.network.FreedomPayConnectionHelper
-printer/PaxS300Printer.java
- printer.PaxS300Printer
 pax/payment/ExtraData.java
  pax.payment.ExtraData
+printer/PaxS300Printer.java
+ printer.PaxS300Printer
+printer/Commands.java
+ printer.Commands
 pax/payment/PaxS300PaymentRequest.java
  pax.payment.PaxS300PaymentRequest
 pax/PAXS300PaymentDevice.java

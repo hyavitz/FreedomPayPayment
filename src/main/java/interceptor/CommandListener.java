@@ -197,8 +197,8 @@ public class CommandListener implements Client.CommandListener {
 
         //Payment.insertPaymentCapture(responseMessage.getLocation_id(), responseMessage.getUnique_ticket_id(), transactionStatus, paymentDetails);
 
-        double approvedAmount = Double.parseDouble(paymentDetails.getApprovedAmount());
-        double dueAmount = Double.parseDouble(paymentDetails.getAmount());
+        double approvedAmount = Double.parseDouble((paymentDetails.getApprovedAmount()).isEmpty() ? "0.00" : paymentDetails.getApprovedAmount());
+        double dueAmount = Double.parseDouble(paymentDetails.getAmount().isEmpty() ? "0.00" : paymentDetails.getAmount());
 
         System.out.println("sure would like to send this amount of $" + dueAmount + " to the server...");
         if (approvedAmount > dueAmount) {
