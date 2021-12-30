@@ -56,7 +56,7 @@ public class FreedomPayPaymentDevice implements IPaymentDevice {
     private static FreedomPayDataStreamManager freedomPayDataStreamManager;
     private static FreedomPayPaymentDevice freedomPayPaymentDevice;
 
-    private FreedomPayPaymentDevice(){}
+    public FreedomPayPaymentDevice(){}
 
     public static FreedomPayPaymentDevice getFreedomPayPaymentDeviceInstance() throws IOException {
         if (freedomPayPaymentDevice == null) {

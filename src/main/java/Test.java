@@ -1,4 +1,5 @@
 import config.Device;
+import freedompay.FreedomPayPaymentDevice;
 import interceptor.Client;
 import interceptor.CommandListener;
 import interceptor.InterceptorClient;
@@ -21,43 +22,43 @@ public class Test {
 
     public static void main(String[] args) throws IOException, InterruptedException {
 
-        Heartbeat.checkHeartbeat();
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            // TODO: Alert POS - Heartbeat Failure - (1)
-        }
-        System.out.println("<1><>HEARTBEAT: " + Heartbeat.hasNetworkConnection);
+//        Heartbeat.checkHeartbeat();
+//        try {
+//            Thread.sleep(2000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//            // TODO: Alert POS - Heartbeat Failure - (1)
+//        }
+//        System.out.println("<1><>HEARTBEAT: " + Heartbeat.hasNetworkConnection);
+//
+//        Token.generateToken();
+//        try {
+//            Thread.sleep(2000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//            // TODO: Alert POS - Token Generate Failure - (1)
+//        }
+//        System.out.println("<2><>TOKEN: " + Token.token);
+//
+//
+//        Device.registerDevice(Token.token);
+//        try {
+//            Thread.sleep(2000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//            // TODO: Alert POS - Device Register Failure - (1)
+//        }
+//        netRegisterDevice = Device.netRegisterDevice;
+//        System.out.println("<3><>NET REGISTER DEVICE: " + netRegisterDevice);
+//
+//        assert Heartbeat.hasNetworkConnection && Token.token != null && netRegisterDevice != null;
 
-        Token.generateToken();
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            // TODO: Alert POS - Token Generate Failure - (1)
-        }
-        System.out.println("<2><>TOKEN: " + Token.token);
+        PaymentGUI.getPaymentGUIInstance();
 
+        FileWatcher fileWatcher = new FileWatcher();
+        fileWatcher.setWatchService();
 
-        Device.registerDevice(Token.token);
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            // TODO: Alert POS - Device Register Failure - (1)
-        }
-        netRegisterDevice = Device.netRegisterDevice;
-        System.out.println("<3><>NET REGISTER DEVICE: " + netRegisterDevice);
-
-        assert Heartbeat.hasNetworkConnection && Token.token != null && netRegisterDevice != null;
-
-//        PaymentGUI.getPaymentGUIInstance();
-
-//        FileWatcher fileWatcher = new FileWatcher();
-//        fileWatcher.setWatchService();
-
-        IPaymentDevice paymentDevice = new PAXS300PaymentDevice();
+        IPaymentDevice paymentDevice = new FreedomPayPaymentDevice();
         Client.CommandListener listener = new CommandListener(paymentDevice);
         InterceptorClient ic = InterceptorClient.getInstance().addCommandHandler(listener);
         InterceptorClient.netRegisterDevice = netRegisterDevice;
